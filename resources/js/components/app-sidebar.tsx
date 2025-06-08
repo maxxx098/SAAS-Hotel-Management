@@ -75,9 +75,18 @@ const getMainNavItems = (isAdmin: boolean): NavItem[] => {
         ];
         
         return [...baseItems, ...adminItems];
+    } else {
+        // Only show "My Bookings" for regular users/clients, not admins
+        const userItems: NavItem[] = [
+            {
+                title: 'My Bookings',
+                href: route('bookings'),
+                icon: FileText,
+            },
+        ];
+        
+        return [...baseItems, ...userItems];
     }
-
-    return baseItems;
 };
 
 export function AppSidebar() {
