@@ -13,6 +13,6 @@ class BookingController extends Controller
      */
     public function index(): Response
     {
-        return Inertia::render('admin/bookings/bookings');
+        return Inertia::render('admin/bookings/index');
     }
 }
