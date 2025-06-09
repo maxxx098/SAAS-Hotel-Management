@@ -18,7 +18,8 @@ import {
     BarChart3, 
     FileText, 
     Shield,
-    User as UserIcon 
+    User as UserIcon, 
+    Building
 } from 'lucide-react';
 import AppLogo from './app-logo';
 
@@ -71,6 +72,11 @@ const getMainNavItems = (isAdmin: boolean): NavItem[] => {
                 title: 'Bookings',
                 href: route('admin.bookings'),
                 icon: FileText,
+            },
+            {
+                title: 'Rooms',
+                href: route('admin.rooms.index'),
+                icon: Building,
             },
         ];
         

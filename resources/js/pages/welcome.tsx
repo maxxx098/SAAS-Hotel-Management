@@ -1,5 +1,9 @@
 import { type SharedData } from '@/types';
 import { Head, Link, usePage } from '@inertiajs/react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import { 
     Users, 
     Bed, 
@@ -17,301 +21,286 @@ import {
     Star,
     Building,
     Globe,
-    Zap
+    Zap,
+    PlayCircle,
+    Trophy,
+    HeadphonesIcon
 } from 'lucide-react';
 
 export default function Welcome() {
     const { auth } = usePage<SharedData>().props;
 
+    const features = [
+        {
+            icon: <Calendar className="h-8 w-8" />,
+            title: 'Reservation Management',
+            description: 'Handle bookings, cancellations, and modifications with ease. Real-time availability and automated confirmations.',
+            badge: 'Online & offline bookings',
+            color: 'from-blue-600 to-indigo-600',
+            bgColor: 'from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20'
+        },
+        {
+            icon: <BarChart3 className="h-8 w-8" />,
+            title: 'Analytics & Reporting',
+            description: 'Track occupancy rates, revenue, and guest satisfaction. Make data-driven decisions with comprehensive insights.',
+            badge: 'Real-time dashboards',
+            color: 'from-purple-600 to-pink-600',
+            bgColor: 'from-purple-50 to-pink-50 dark:from-purple-950/20 dark:to-pink-950/20'
+        },
+        {
+            icon: <Users className="h-8 w-8" />,
+            title: 'Guest Management',
+            description: 'Maintain detailed guest profiles, preferences, and history. Personalize experiences and build loyalty.',
+            badge: 'Personalized service',
+            color: 'from-indigo-600 to-blue-600',
+            bgColor: 'from-indigo-50 to-blue-50 dark:from-indigo-950/20 dark:to-blue-950/20'
+        },
+        {
+            icon: <Bed className="h-8 w-8" />,
+            title: 'Room Management',
+            description: 'Monitor room status, schedule housekeeping, and manage maintenance requests efficiently.',
+            badge: 'Automated workflows',
+            color: 'from-green-600 to-emerald-600',
+            bgColor: 'from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20'
+        },
+        {
+            icon: <DollarSign className="h-8 w-8" />,
+            title: 'Revenue Management',
+            description: 'Optimize pricing strategies, track financial performance, and manage billing seamlessly.',
+            badge: 'Dynamic pricing',
+            color: 'from-yellow-600 to-orange-600',
+            bgColor: 'from-yellow-50 to-orange-50 dark:from-yellow-950/20 dark:to-orange-950/20'
+        },
+        {
+            icon: <Smartphone className="h-8 w-8" />,
+            title: 'Mobile Access',
+            description: 'Access your hotel management system anywhere, anytime. Full functionality on mobile devices.',
+            badge: 'Always connected',
+            color: 'from-red-600 to-pink-600',
+            bgColor: 'from-red-50 to-pink-50 dark:from-red-950/20 dark:to-pink-950/20'
+        }
+    ];
+
+    const stats = [
+        { value: '2,500+', label: 'Hotels Managed', icon: <Building className="h-5 w-5" /> },
+        { value: '1M+', label: 'Reservations Processed', icon: <Calendar className="h-5 w-5" /> },
+        { value: '98%', label: 'Customer Satisfaction', icon: <Trophy className="h-5 w-5" /> },
+        { value: '24/7', label: 'Support Available', icon: <HeadphonesIcon className="h-5 w-5" /> }
+    ];
+
     return (
-        <>
+        <div className="min-h-screen bg-background text-foreground">
             <Head title="Welcome">
                 <link rel="preconnect" href="https://fonts.bunny.net" />
                 <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600" rel="stylesheet" />
             </Head>
-            <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-indigo-900">
-                {/* Header */}
-                <header className="relative z-50 w-full border-b border-white/10 bg-white/80 backdrop-blur-md dark:bg-slate-900/80">
-                    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                        <div className="flex h-16 items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600">
-                                    <Building className="h-6 w-6 text-white" />
-                                </div>
-                                <span className="text-xl font-bold text-slate-900 dark:text-white">HotelManager</span>
+
+            {/* Header */}
+            <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+                <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
+                    <div className="flex h-16 items-center justify-between">
+                        <Link href="/" className="flex items-center gap-2">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600">
+                                <Building className="h-6 w-6 text-white" />
                             </div>
-                            <nav className="flex items-center gap-4">
-                                {auth.user ? (
-                                    <Link
-                                        href={route('dashboard')}
-                                        className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-lg transition-all hover:from-blue-700 hover:to-indigo-700 hover:shadow-xl"
-                                    >
-                                        Dashboard <ArrowRight className="h-4 w-4" />
+                            <span className="text-xl font-bold">HotelManager</span>
+                        </Link>
+                        <nav className="flex items-center gap-4">
+                            <Button variant="ghost" asChild>
+                                <Link href={route('rooms.index')}>
+                                    Our Rooms
+                                </Link>
+                            </Button>
+                            {auth.user ? (
+                                <Button asChild>
+                                    <Link href={route('dashboard')}>
+                                        Dashboard <ArrowRight className="ml-2 h-4 w-4" />
                                     </Link>
-                                ) : (
-                                    <>
-                                        <Link
-                                            href={route('login')}
-                                            className="rounded-lg px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
-                                        >
+                                </Button>
+                            ) : (
+                                <>
+                                    <Button variant="ghost" asChild>
+                                        <Link href={route('login')}>
                                             Log in
                                         </Link>
-                                        <Link
-                                            href={route('register')}
-                                            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-lg transition-all hover:from-blue-700 hover:to-indigo-700 hover:shadow-xl"
-                                        >
-                                            Get Started <ArrowRight className="h-4 w-4" />
+                                    </Button>
+                                    <Button asChild>
+                                        <Link href={route('register')}>
+                                            Get Started <ArrowRight className="ml-2 h-4 w-4" />
                                         </Link>
-                                    </>
-                                )}
-                            </nav>
-                        </div>
+                                    </Button>
+                                </>
+                            )}
+                        </nav>
                     </div>
-                </header>
+                </div>
+            </header>
 
-                {/* Hero Section */}
-                <section className="relative overflow-hidden py-20 sm:py-32">
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 via-purple-600/20 to-indigo-600/20 blur-3xl"></div>
-                    <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                        <div className="text-center">
-                            <h1 className="mx-auto max-w-4xl text-5xl font-bold tracking-tight text-slate-900 sm:text-7xl dark:text-white">
-                                Streamline Your
-                                <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent"> Hotel Operations</span>
-                            </h1>
-                            <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-slate-600 dark:text-slate-300">
-                                Manage reservations, track revenue, monitor staff, and deliver exceptional guest experiences with our comprehensive hotel management platform.
-                            </p>
-                            <div className="mt-10 flex items-center justify-center gap-6">
-                                {!auth.user && (
-                                    <Link
-                                        href={route('register')}
-                                        className="group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-8 py-4 text-lg font-semibold text-white shadow-2xl transition-all hover:from-blue-700 hover:to-indigo-700 hover:shadow-blue-500/25"
-                                    >
-                                        Start Free Trial
-                                        <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
-                                    </Link>
-                                )}
-                                <button className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-8 py-4 text-lg font-semibold text-slate-900 transition-all hover:bg-slate-50 hover:shadow-lg dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:hover:bg-slate-700">
-                                    <Globe className="h-5 w-5" />
-                                    View Demo
-                                </button>
-                            </div>
-                        </div>
+            {/* Hero Section */}
+            <section className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl py-20 sm:py-32">
+                <div className="text-center space-y-8">
+                    <div className="space-y-4">
+                        <Badge variant="secondary" className="bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                            Trusted by 2,500+ Hotels Worldwide
+                        </Badge>
+                        <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight">
+                            Streamline Your{' '}
+                            <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">
+                                Hotel Operations
+                            </span>
+                        </h1>
+                        <p className="mx-auto max-w-2xl text-lg text-muted-foreground leading-8">
+                            Manage reservations, track revenue, monitor staff, and deliver exceptional guest experiences with our comprehensive hotel management platform.
+                        </p>
                     </div>
-                </section>
-
-                {/* Features Grid */}
-                <section className="py-24 sm:py-32">
-                    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                        <div className="mx-auto max-w-2xl text-center">
-                            <h2 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl dark:text-white">
-                                Everything you need to manage your hotel
-                            </h2>
-                            <p className="mt-4 text-lg text-slate-600 dark:text-slate-300">
-                                From front desk operations to financial reporting, we've got you covered.
-                            </p>
-                        </div>
-                        
-                        <div className="mx-auto mt-16 max-w-2xl sm:mt-20 lg:mt-24 lg:max-w-none">
-                            <div className="grid max-w-xl grid-cols-1 gap-8 lg:max-w-none lg:grid-cols-3">
-                                {/* Feature 1 */}
-                                <div className="group relative overflow-hidden rounded-2xl bg-white p-8 shadow-lg transition-all hover:shadow-2xl hover:shadow-blue-500/10 dark:bg-slate-800">
-                                    <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-indigo-50 opacity-50 dark:from-blue-900/20 dark:to-indigo-900/20"></div>
-                                    <div className="relative">
-                                        <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
-                                            <Calendar className="h-8 w-8" />
-                                        </div>
-                                        <h3 className="mt-6 text-xl font-semibold text-slate-900 dark:text-white">
-                                            Reservation Management
-                                        </h3>
-                                        <p className="mt-4 text-slate-600 dark:text-slate-300">
-                                            Handle bookings, cancellations, and modifications with ease. Real-time availability and automated confirmations.
-                                        </p>
-                                        <div className="mt-6 flex items-center gap-2 text-sm font-medium text-blue-600 dark:text-blue-400">
-                                            <CheckCircle className="h-4 w-4" />
-                                            Online & offline bookings
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Feature 2 */}
-                                <div className="group relative overflow-hidden rounded-2xl bg-white p-8 shadow-lg transition-all hover:shadow-2xl hover:shadow-purple-500/10 dark:bg-slate-800">
-                                    <div className="absolute inset-0 bg-gradient-to-br from-purple-50 to-pink-50 opacity-50 dark:from-purple-900/20 dark:to-pink-900/20"></div>
-                                    <div className="relative">
-                                        <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white">
-                                            <BarChart3 className="h-8 w-8" />
-                                        </div>
-                                        <h3 className="mt-6 text-xl font-semibold text-slate-900 dark:text-white">
-                                            Analytics & Reporting
-                                        </h3>
-                                        <p className="mt-4 text-slate-600 dark:text-slate-300">
-                                            Track occupancy rates, revenue, and guest satisfaction. Make data-driven decisions with comprehensive insights.
-                                        </p>
-                                        <div className="mt-6 flex items-center gap-2 text-sm font-medium text-purple-600 dark:text-purple-400">
-                                            <TrendingUp className="h-4 w-4" />
-                                            Real-time dashboards
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Feature 3 */}
-                                <div className="group relative overflow-hidden rounded-2xl bg-white p-8 shadow-lg transition-all hover:shadow-2xl hover:shadow-indigo-500/10 dark:bg-slate-800">
-                                    <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 to-blue-50 opacity-50 dark:from-indigo-900/20 dark:to-blue-900/20"></div>
-                                    <div className="relative">
-                                        <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 text-white">
-                                            <Users className="h-8 w-8" />
-                                        </div>
-                                        <h3 className="mt-6 text-xl font-semibold text-slate-900 dark:text-white">
-                                            Guest Management
-                                        </h3>
-                                        <p className="mt-4 text-slate-600 dark:text-slate-300">
-                                            Maintain detailed guest profiles, preferences, and history. Personalize experiences and build loyalty.
-                                        </p>
-                                        <div className="mt-6 flex items-center gap-2 text-sm font-medium text-indigo-600 dark:text-indigo-400">
-                                            <Star className="h-4 w-4" />
-                                            Personalized service
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Feature 4 */}
-                                <div className="group relative overflow-hidden rounded-2xl bg-white p-8 shadow-lg transition-all hover:shadow-2xl hover:shadow-green-500/10 dark:bg-slate-800">
-                                    <div className="absolute inset-0 bg-gradient-to-br from-green-50 to-emerald-50 opacity-50 dark:from-green-900/20 dark:to-emerald-900/20"></div>
-                                    <div className="relative">
-                                        <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 text-white">
-                                            <Bed className="h-8 w-8" />
-                                        </div>
-                                        <h3 className="mt-6 text-xl font-semibold text-slate-900 dark:text-white">
-                                            Room Management
-                                        </h3>
-                                        <p className="mt-4 text-slate-600 dark:text-slate-300">
-                                            Monitor room status, schedule housekeeping, and manage maintenance requests efficiently.
-                                        </p>
-                                        <div className="mt-6 flex items-center gap-2 text-sm font-medium text-green-600 dark:text-green-400">
-                                            <CheckCircle className="h-4 w-4" />
-                                            Automated workflows
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Feature 5 */}
-                                <div className="group relative overflow-hidden rounded-2xl bg-white p-8 shadow-lg transition-all hover:shadow-2xl hover:shadow-yellow-500/10 dark:bg-slate-800">
-                                    <div className="absolute inset-0 bg-gradient-to-br from-yellow-50 to-orange-50 opacity-50 dark:from-yellow-900/20 dark:to-orange-900/20"></div>
-                                    <div className="relative">
-                                        <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-gradient-to-r from-yellow-600 to-orange-600 text-white">
-                                            <DollarSign className="h-8 w-8" />
-                                        </div>
-                                        <h3 className="mt-6 text-xl font-semibold text-slate-900 dark:text-white">
-                                            Revenue Management
-                                        </h3>
-                                        <p className="mt-4 text-slate-600 dark:text-slate-300">
-                                            Optimize pricing strategies, track financial performance, and manage billing seamlessly.
-                                        </p>
-                                        <div className="mt-6 flex items-center gap-2 text-sm font-medium text-yellow-600 dark:text-yellow-400">
-                                            <TrendingUp className="h-4 w-4" />
-                                            Dynamic pricing
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Feature 6 */}
-                                <div className="group relative overflow-hidden rounded-2xl bg-white p-8 shadow-lg transition-all hover:shadow-2xl hover:shadow-red-500/10 dark:bg-slate-800">
-                                    <div className="absolute inset-0 bg-gradient-to-br from-red-50 to-pink-50 opacity-50 dark:from-red-900/20 dark:to-pink-900/20"></div>
-                                    <div className="relative">
-                                        <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-gradient-to-r from-red-600 to-pink-600 text-white">
-                                            <Smartphone className="h-8 w-8" />
-                                        </div>
-                                        <h3 className="mt-6 text-xl font-semibold text-slate-900 dark:text-white">
-                                            Mobile Access
-                                        </h3>
-                                        <p className="mt-4 text-slate-600 dark:text-slate-300">
-                                            Access your hotel management system anywhere, anytime. Full functionality on mobile devices.
-                                        </p>
-                                        <div className="mt-6 flex items-center gap-2 text-sm font-medium text-red-600 dark:text-red-400">
-                                            <Zap className="h-4 w-4" />
-                                            Always connected
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                    
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                        {!auth.user && (
+                            <Button size="lg" className="text-lg px-8 py-6 h-auto" asChild>
+                                <Link href={route('register')}>
+                                    Start Free Trial
+                                    <ArrowRight className="ml-2 h-5 w-5" />
+                                </Link>
+                            </Button>
+                        )}
+                        <Button size="lg" variant="outline" className="text-lg px-8 py-6 h-auto">
+                            <PlayCircle className="mr-2 h-5 w-5" />
+                            View Demo
+                        </Button>
                     </div>
-                </section>
+                </div>
+            </section>
 
-                {/* Stats Section */}
-                <section className="bg-gradient-to-r from-blue-600 to-indigo-600 py-24 sm:py-32">
-                    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                        <div className="mx-auto max-w-2xl text-center">
-                            <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+            {/* Features Section */}
+            <section className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl py-24 sm:py-32">
+                <div className="text-center space-y-4 mb-16">
+                    <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">
+                        Everything you need to manage your hotel
+                    </h2>
+                    <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                        From front desk operations to financial reporting, we've got you covered with powerful tools and insights.
+                    </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    {features.map((feature, index) => (
+                        <Card key={index} className="group relative overflow-hidden border-border hover:shadow-lg transition-all duration-300 hover:scale-[1.02]">
+                            <div className={`absolute inset-0 bg-gradient-to-br ${feature.bgColor} opacity-50`}></div>
+                            <CardHeader className="relative">
+                                <div className={`flex h-16 w-16 items-center justify-center rounded-xl bg-gradient-to-r ${feature.color} text-white mb-4`}>
+                                    {feature.icon}
+                                </div>
+                                <CardTitle className="text-xl">{feature.title}</CardTitle>
+                                <CardDescription className="text-base">
+                                    {feature.description}
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="relative">
+                                <Badge variant="secondary" className="bg-background/80">
+                                    <CheckCircle className="mr-1 h-3 w-3" />
+                                    {feature.badge}
+                                </Badge>
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
+            </section>
+
+            {/* Stats Section */}
+            <section className="py-24 sm:py-32">
+                <Card className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl bg-gradient-to-r from-blue-600 to-indigo-600 border-0 text-white">
+                    <CardContent className="py-16">
+                        <div className="text-center space-y-4 mb-16">
+                            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-white">
                                 Trusted by hotels worldwide
                             </h2>
-                            <p className="mt-4 text-lg text-blue-100">
+                            <p className="text-lg text-blue-100 max-w-2xl mx-auto">
                                 Join thousands of hotels that have transformed their operations with our platform.
                             </p>
                         </div>
-                        <div className="mx-auto mt-16 grid max-w-lg grid-cols-1 gap-8 sm:max-w-none sm:grid-cols-2 lg:grid-cols-4">
-                            <div className="text-center">
-                                <div className="text-4xl font-bold text-white">2,500+</div>
-                                <div className="mt-2 text-blue-100">Hotels Managed</div>
-                            </div>
-                            <div className="text-center">
-                                <div className="text-4xl font-bold text-white">1M+</div>
-                                <div className="mt-2 text-blue-100">Reservations Processed</div>
-                            </div>
-                            <div className="text-center">
-                                <div className="text-4xl font-bold text-white">98%</div>
-                                <div className="mt-2 text-blue-100">Customer Satisfaction</div>
-                            </div>
-                            <div className="text-center">
-                                <div className="text-4xl font-bold text-white">24/7</div>
-                                <div className="mt-2 text-blue-100">Support Available</div>
-                            </div>
+                        
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+                            {stats.map((stat, index) => (
+                                <div key={index} className="text-center space-y-2">
+                                    <div className="flex items-center justify-center text-blue-200 mb-2">
+                                        {stat.icon}
+                                    </div>
+                                    <div className="text-4xl font-bold text-white">{stat.value}</div>
+                                    <div className="text-blue-100">{stat.label}</div>
+                                </div>
+                            ))}
                         </div>
-                    </div>
-                </section>
+                    </CardContent>
+                </Card>
+            </section>
 
-                {/* CTA Section */}
-                <section className="py-24 sm:py-32">
-                    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                        <div className="mx-auto max-w-2xl text-center">
-                            <h2 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl dark:text-white">
+            {/* CTA Section */}
+            <section className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl py-24 sm:py-32">
+                <Card className="text-center p-8 sm:p-12 border-border">
+                    <CardContent className="space-y-6">
+                        <div className="space-y-4">
+                            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">
                                 Ready to transform your hotel?
                             </h2>
-                            <p className="mt-4 text-lg text-slate-600 dark:text-slate-300">
-                                Start your free trial today and see how our platform can streamline your operations.
+                            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                                Start your free trial today and see how our platform can streamline your operations and boost your revenue.
                             </p>
-                            <div className="mt-8 flex items-center justify-center gap-6">
-                                {!auth.user && (
-                                    <Link
-                                        href={route('register')}
-                                        className="group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-8 py-4 text-lg font-semibold text-white shadow-2xl transition-all hover:from-blue-700 hover:to-indigo-700 hover:shadow-blue-500/25"
-                                    >
+                        </div>
+                        
+                        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                            {!auth.user && (
+                                <Button size="lg" className="text-lg px-8 py-6 h-auto" asChild>
+                                    <Link href={route('register')}>
                                         Get Started Free
-                                        <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
+                                        <ArrowRight className="ml-2 h-5 w-5" />
                                     </Link>
-                                )}
-                            </div>
+                                </Button>
+                            )}
+                            <Button size="lg" variant="outline" className="text-lg px-8 py-6 h-auto">
+                                <Globe className="mr-2 h-5 w-5" />
+                                Learn More
+                            </Button>
                         </div>
-                    </div>
-                </section>
-
-                {/* Footer */}
-                <footer className="border-t border-slate-200 bg-white py-12 dark:border-slate-800 dark:bg-slate-900">
-                    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                        <div className="flex items-center justify-between">
+                        
+                        <Separator className="my-8" />
+                        
+                        <div className="flex flex-col sm:flex-row items-center justify-center gap-8 text-sm text-muted-foreground">
                             <div className="flex items-center gap-2">
-                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600">
-                                    <Building className="h-5 w-5 text-white" />
-                                </div>
-                                <span className="text-lg font-bold text-slate-900 dark:text-white">HotelManager</span>
+                                <CheckCircle className="h-4 w-4 text-green-500" />
+                                <span>30-day free trial</span>
                             </div>
-                            <p className="text-sm text-slate-600 dark:text-slate-400">
-                                © 2024 HotelManager. All rights reserved.
-                            </p>
+                            <div className="flex items-center gap-2">
+                                <CheckCircle className="h-4 w-4 text-green-500" />
+                                <span>No credit card required</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <CheckCircle className="h-4 w-4 text-green-500" />
+                                <span>24/7 support included</span>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            </section>
+
+            {/* Footer */}
+            <footer className="border-t border-border bg-muted/50">
+                <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl py-12">
+                    <div className="flex flex-col sm:flex-row items-center justify-between space-y-4 sm:space-y-0">
+                        <Link href="/" className="flex items-center gap-2">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600">
+                                <Building className="h-5 w-5 text-white" />
+                            </div>
+                            <span className="text-lg font-bold">HotelManager</span>
+                        </Link>
+                        <div className="flex items-center gap-6 text-sm text-muted-foreground">
+                            <span>© 2024 HotelManager. All rights reserved.</span>
+                            <Separator orientation="vertical" className="h-4" />
+                            <Link href="#" className="hover:text-foreground transition-colors">Privacy</Link>
+                            <Link href="#" className="hover:text-foreground transition-colors">Terms</Link>
                         </div>
                     </div>
-                </footer>
-            </div>
-        </>
+                </div>
+            </footer>
+        </div>
     );
 }
