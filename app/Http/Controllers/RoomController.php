@@ -46,7 +46,8 @@ class RoomController extends Controller
                       ->orderBy('created_at', 'desc')
                       ->paginate(12)
                       ->withQueryString();
-
+        
+        
         return Inertia::render('public/rooms/index', [
             'rooms' => $rooms,
             'filters' => $request->only(['search', 'type', 'availability']),

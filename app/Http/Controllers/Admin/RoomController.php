@@ -11,6 +11,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Storage;
 
 class RoomController extends Controller
 {
@@ -71,29 +72,39 @@ class RoomController extends Controller
     /**
      * Store a newly created room
      */
-    public function store(Request $request): RedirectResponse
-    {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:rooms',
-            'description' => 'nullable|string',
-            'type' => 'required|string|in:single,double,suite,family,deluxe',
-            'price_per_night' => 'required|numeric|min:0',
-            'capacity' => 'required|integer|min:1|max:10',
-            'beds' => 'required|integer|min:1|max:5',
-            'size' => 'nullable|numeric|min:0',
-            'amenities' => 'nullable|array',
-            'amenities.*' => 'string',
-            'images' => 'nullable|array',
-            'images.*' => 'string|url',
-            'is_available' => 'boolean',
-            'is_active' => 'boolean',
-        ]);
+   public function store(Request $request): RedirectResponse
+{
+    $validated = $request->validate([
+        'name' => 'required|string|max:255|unique:rooms',
+        'description' => 'nullable|string',
+        'type' => 'required|string|in:single,double,suite,family,deluxe',
+        'price_per_night' => 'required|numeric|min:0',
+        'capacity' => 'required|integer|min:1|max:10',
+        'beds' => 'required|integer|min:1|max:5',
+        'size' => 'nullable|numeric|min:0',
+        'amenities' => 'nullable|array',
+        'amenities.*' => 'string',
+        'images' => 'nullable|array',
+        'images.*' => 'image|mimes:jpg,jpeg,png,webp|max:2048',
+        'is_available' => 'boolean',
+        'is_active' => 'boolean',
+    ]);
 
-        Room::create($validated);
+    $imagePaths = [];
 
-        return redirect()->route('admin.rooms.index')
-            ->with('success', 'Room created successfully.');
+    if ($request->hasFile('images')) {
+        foreach ($request->file('images') as $image) {
+            $imagePaths[] = $image->store('rooms', 'public'); // stored in storage/app/public/rooms
+        }
     }
+
+    $validated['images'] = $imagePaths;
+
+    Room::create($validated);
+
+    return redirect()->route('admin.rooms.index')
+        ->with('success', 'Room created successfully.');
+}
 
     /**
      * Display the specified room

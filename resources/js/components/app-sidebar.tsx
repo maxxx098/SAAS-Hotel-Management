@@ -59,11 +59,6 @@ const getMainNavItems = (isAdmin: boolean): NavItem[] => {
             href: route('dashboard'),
             icon: LayoutGrid,
         },
-        {
-            title: 'Profile',
-            href: route('profile.edit'),
-            icon: UserIcon,
-        },
     ];
 
     if (isAdmin) {
@@ -85,7 +80,7 @@ const getMainNavItems = (isAdmin: boolean): NavItem[] => {
         // Only show "My Bookings" for regular users/clients, not admins
         const userItems: NavItem[] = [
             {
-                title: 'My Bookings',
+                title: 'Bookings',
                 href: route('bookings'),
                 icon: FileText,
             },

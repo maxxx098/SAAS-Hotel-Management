@@ -275,7 +275,7 @@ export default function RoomsPage({ rooms, filters, roomTypes }: RoomsPageProps)
               <div className="relative h-48 bg-muted">
                 {room.images && room.images.length > 0 ? (
                   <img
-                    src={room.images[0]}
+                    src={room.images[0].startsWith('http') ? room.images[0] : `/storage/${room.images[0]}`}
                     alt={room.name}
                     className="w-full h-full object-cover"
                   />
@@ -284,6 +284,7 @@ export default function RoomsPage({ rooms, filters, roomTypes }: RoomsPageProps)
                     <Bed className="h-12 w-12" />
                   </div>
                 )}
+
                 
                 {/* Availability Badge */}
                 <div className="absolute top-3 right-3">

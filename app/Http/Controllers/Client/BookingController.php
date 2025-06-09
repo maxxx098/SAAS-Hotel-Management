@@ -31,7 +31,7 @@ class BookingController extends Controller
                          ->paginate(10)
                          ->withQueryString();
 
-        return Inertia::render('user/bookings/index', [
+        return Inertia::render('dashboard/user/bookings/index', [
             'bookings' => $bookings,
             'filters' => $request->only(['status']),
         ]);
