@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { Search, Users, Bed, Maximize2, Wifi, Tv, Car, Coffee, Bath, Shield, Wind, Utensils, Star, MapPin, Building, Filter, Link, ArrowRight } from 'lucide-react';
 import { SharedData } from '@/types';
-
+import Layout from '@/components/layout';
 interface Room {
   id: number;
   name: string;
@@ -129,51 +129,12 @@ export default function RoomsPage({ rooms, filters, roomTypes }: RoomsPageProps)
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <Layout>
+     <div className="min-h-screen bg-background text-foreground">
       <Head title="Our Rooms" />
-
-      <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-                <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
-                    <div className="flex h-16 items-center justify-between">
-                        <Link href="/" className="flex items-center gap-2">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600">
-                                <Building className="h-6 w-6 text-white" />
-                            </div>
-                            <span className="text-xl font-bold">HotelManager</span>
-                        </Link>
-                        <nav className="flex items-center gap-4">
-                            <Button variant="ghost" asChild>
-                                <Link href={route('rooms.index')}>
-                                    Our Rooms
-                                </Link>
-                            </Button>
-                            {auth.user ? (
-                                <Button asChild>
-                                    <Link href={route('dashboard')}>
-                                        Dashboard <ArrowRight className="ml-2 h-4 w-4" />
-                                    </Link>
-                                </Button>
-                            ) : (
-                                <>
-                                    <Button variant="ghost" asChild>
-                                        <Link href={route('login')}>
-                                            Log in
-                                        </Link>
-                                    </Button>
-                                    <Button asChild>
-                                        <Link href={route('register')}>
-                                            Get Started <ArrowRight className="ml-2 h-4 w-4" />
-                                        </Link>
-                                    </Button>
-                                </>
-                            )}
-                        </nav>
-                    </div>
-                </div>
-            </header>
       
       {/* Main Container */}
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-16 max-w-7xl py-20 sm:py-20">
         
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -449,5 +410,6 @@ export default function RoomsPage({ rooms, filters, roomTypes }: RoomsPageProps)
         )}
       </div>
     </div>
+    </Layout>
   );
 }

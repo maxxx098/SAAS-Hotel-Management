@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Head } from '@inertiajs/react';
+import { useState, useEffect, useCallback } from 'react';
+import { Head, router } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import {
@@ -12,6 +12,15 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+
+export function useToast() {
+    // This is a placeholder. Replace with your actual toast logic or library.
+    const toast = useCallback(({ title, description, variant }: { title: string, description: string, variant?: string }) => {
+        alert(`${title}: ${description}`);
+    }, []);
+    return { toast };
+}
+
 import {
     Calendar,
     Users,
@@ -24,13 +33,47 @@ import {
     User,
     Phone,
     Mail,
-    MapPin,
-    Star,
     TrendingUp,
     Eye,
     Check,
-    X
+    X,
+    RefreshCw
 } from 'lucide-react';
+
+interface Booking {
+    id: number;
+    guest_name: string;
+    guest_email: string;
+    guest_phone: string;
+    check_in: string;
+    check_out: string;
+    adults: number;
+    children: number;
+    room_type: string;
+    room_price: number;
+    nights: number;
+    total_amount: number;
+    status: 'pending' | 'confirmed' | 'rejected';
+    booking_date: string;
+    special_requests?: string;
+    booking_source: string;
+}
+
+interface BookingStats {
+    totalBookings: number;
+    pendingBookings: number;
+    confirmedBookings: number;
+    rejectedBookings: number;
+    totalRevenue: number;
+    avgBookingValue: number;
+    todayRequests?: number;
+    todayProcessed?: number;
+}
+
+interface Props {
+    bookings: Booking[];
+    stats: BookingStats;
+}
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -43,107 +86,84 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-// Mock data for booking requests
-const bookingRequests = [
-    {
-        id: 1,
-        guest_name: 'John Smith',
-        guest_email: 'john.smith@email.com',
-        guest_phone: '+1 (555) 123-4567',
-        check_in: '2024-06-15',
-        check_out: '2024-06-18',
-        adults: 2,
-        children: 1,
-        room_type: 'Deluxe Ocean View',
-        room_price: 299,
-        nights: 3,
-        total_amount: 1007.64,
-        status: 'pending',
-        booking_date: '2024-06-08',
-        special_requests: 'Late check-in requested, celebrating anniversary',
-        booking_source: 'website'
-    },
-    {
-        id: 2,
-        guest_name: 'Sarah Johnson',
-        guest_email: 'sarah.j@email.com',
-        guest_phone: '+1 (555) 987-6543',
-        check_in: '2024-06-20',
-        check_out: '2024-06-25',
-        adults: 1,
-        children: 0,
-        room_type: 'Executive Suite',
-        room_price: 459,
-        nights: 5,
-        total_amount: 2570.40,
-        status: 'pending',
-        booking_date: '2024-06-07',
-        special_requests: 'Business trip, need early check-in',
-        booking_source: 'phone'
-    },
-    {
-        id: 3,
-        guest_name: 'Mike Wilson',
-        guest_email: 'mike.wilson@email.com',
-        guest_phone: '+1 (555) 456-7890',
-        check_in: '2024-06-12',
-        check_out: '2024-06-14',
-        adults: 2,
-        children: 0,
-        room_type: 'Standard Room',
-        room_price: 179,
-        nights: 2,
-        total_amount: 400.96,
-        status: 'confirmed',
-        booking_date: '2024-06-06',
-        special_requests: 'Ground floor room preferred',
-        booking_source: 'website'
-    },
-    {
-        id: 4,
-        guest_name: 'Emma Davis',
-        guest_email: 'emma.davis@email.com',
-        guest_phone: '+1 (555) 321-0987',
-        check_in: '2024-06-10',
-        check_out: '2024-06-12',
-        adults: 4,
-        children: 2,
-        room_type: 'Executive Suite',
-        room_price: 459,
-        nights: 2,
-        total_amount: 1028.16,
-        status: 'rejected',
-        booking_date: '2024-06-05',
-        special_requests: 'Extra beds for children',
-        booking_source: 'mobile_app'
-    }
-];
-
-// Dashboard statistics
-const bookingStats = {
-    totalBookings: bookingRequests.length,
-    pendingBookings: bookingRequests.filter(b => b.status === 'pending').length,
-    confirmedBookings: bookingRequests.filter(b => b.status === 'confirmed').length,
-    rejectedBookings: bookingRequests.filter(b => b.status === 'rejected').length,
-    totalRevenue: bookingRequests
-        .filter(b => b.status === 'confirmed')
-        .reduce((sum, b) => sum + b.total_amount, 0),
-    avgBookingValue: bookingRequests
-        .filter(b => b.status === 'confirmed')
-        .reduce((sum, b) => sum + b.total_amount, 0) / bookingRequests.filter(b => b.status === 'confirmed').length || 0
-};
-
-export default function AdminBookingManagement() {
+export default function AdminBookingManagement({ bookings: initialBookings, stats: initialStats }: Props) {
     const [selectedBooking, setSelectedBooking] = useState<number | null>(null);
-    const [bookings, setBookings] = useState(bookingRequests);
+    const [bookings, setBookings] = useState<Booking[]>(initialBookings);
+    const [stats, setStats] = useState<BookingStats>(initialStats);
+    const [loading, setLoading] = useState(false);
+    const { toast } = useToast();
 
-    const handleBookingAction = (bookingId: number, action: 'confirm' | 'reject') => {
-        setBookings(prev => prev.map(booking => 
-            booking.id === bookingId 
-                ? { ...booking, status: action === 'confirm' ? 'confirmed' : 'rejected' }
-                : booking
-        ));
-        setSelectedBooking(null);
+    const handleBookingAction = async (bookingId: number, action: 'confirm' | 'reject') => {
+        setLoading(true);
+        
+        try {
+            const response = await fetch(`/admin/bookings/${bookingId}/status`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                },
+                body: JSON.stringify({
+                    status: action === 'confirm' ? 'confirmed' : 'rejected',
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to update booking status');
+            }
+
+            // Update local state
+            setBookings(prev => prev.map(booking => 
+                booking.id === bookingId 
+                    ? { ...booking, status: action === 'confirm' ? 'confirmed' : 'rejected' }
+                    : booking
+            ));
+
+            // Update stats
+            setStats(prev => {
+                const newStats = { ...prev };
+                const booking = bookings.find(b => b.id === bookingId);
+                
+                if (booking && booking.status === 'pending') {
+                    newStats.pendingBookings -= 1;
+                    if (action === 'confirm') {
+                        newStats.confirmedBookings += 1;
+                        newStats.totalRevenue += booking.total_amount;
+                    } else {
+                        newStats.rejectedBookings += 1;
+                    }
+                    
+                    // Recalculate average
+                    const confirmedBookings = bookings.filter(b => 
+                        b.status === 'confirmed' || (b.id === bookingId && action === 'confirm')
+                    );
+                    newStats.avgBookingValue = confirmedBookings.length > 0 
+                        ? newStats.totalRevenue / confirmedBookings.length 
+                        : 0;
+                }
+                
+                return newStats;
+            });
+
+            setSelectedBooking(null);
+            
+            toast({
+                title: 'Success',
+                description: `Booking ${action === 'confirm' ? 'confirmed' : 'rejected'} successfully`,
+            });
+        } catch (error) {
+            toast({
+                title: 'Error',
+                description: 'Failed to update booking status',
+                variant: 'destructive',
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const refreshData = () => {
+        router.reload({ only: ['bookings', 'stats'] });
     };
 
     const getStatusBadge = (status: string) => {
@@ -172,9 +192,20 @@ export default function AdminBookingManagement() {
                         <h1 className="text-3xl font-bold tracking-tight">Booking Management</h1>
                         <p className="text-muted-foreground">Review and manage hotel booking requests</p>
                     </div>
-                    <Badge variant="secondary" className="bg-blue-50 text-blue-700">
-                        Admin Panel
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={refreshData}
+                            disabled={loading}
+                        >
+                            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                            Refresh
+                        </Button>
+                        <Badge variant="secondary" className="bg-blue-50 text-blue-700">
+                            Admin Panel
+                        </Badge>
+                    </div>
                 </div>
 
                 {/* Statistics Cards */}
@@ -185,10 +216,10 @@ export default function AdminBookingManagement() {
                             <Calendar className="h-4 w-4 text-muted-foreground" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold">{bookingStats.totalBookings}</div>
+                            <div className="text-2xl font-bold">{stats.totalBookings}</div>
                             <div className="flex items-center text-xs text-muted-foreground">
                                 <TrendingUp className="mr-1 h-3 w-3 text-green-500" />
-                                +12% from last week
+                                Active bookings
                             </div>
                         </CardContent>
                     </Card>
@@ -199,7 +230,7 @@ export default function AdminBookingManagement() {
                             <AlertCircle className="h-4 w-4 text-yellow-500" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold text-yellow-600">{bookingStats.pendingBookings}</div>
+                            <div className="text-2xl font-bold text-yellow-600">{stats.pendingBookings}</div>
                             <div className="text-xs text-muted-foreground">
                                 Requires your attention
                             </div>
@@ -212,7 +243,7 @@ export default function AdminBookingManagement() {
                             <CheckCircle className="h-4 w-4 text-green-500" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold text-green-600">{bookingStats.confirmedBookings}</div>
+                            <div className="text-2xl font-bold text-green-600">{stats.confirmedBookings}</div>
                             <div className="text-xs text-muted-foreground">
                                 Ready for check-in
                             </div>
@@ -225,9 +256,9 @@ export default function AdminBookingManagement() {
                             <DollarSign className="h-4 w-4 text-muted-foreground" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold">${bookingStats.totalRevenue.toLocaleString()}</div>
+                            <div className="text-2xl font-bold">${stats.totalRevenue.toLocaleString()}</div>
                             <div className="text-xs text-muted-foreground">
-                                Avg: ${bookingStats.avgBookingValue.toFixed(0)} per booking
+                                Avg: ${stats.avgBookingValue.toFixed(0)} per booking
                             </div>
                         </CardContent>
                     </Card>
@@ -247,85 +278,92 @@ export default function AdminBookingManagement() {
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                                {bookings.map((booking) => (
-                                    <div
-                                        key={booking.id}
-                                        className={`p-4 rounded-lg border cursor-pointer transition-all ${
-                                            selectedBooking === booking.id
-                                                ? 'border-primary bg-primary/5'
-                                                : 'border-border hover:border-border/80'
-                                        }`}
-                                        onClick={() => setSelectedBooking(booking.id)}
-                                    >
-                                        <div className="flex items-start justify-between mb-3">
-                                            <div>
-                                                <h3 className="font-semibold text-lg">{booking.guest_name}</h3>
-                                                <p className="text-sm text-gray-600">{booking.room_type}</p>
-                                            </div>
-                                            <div className="flex flex-col items-end gap-2">
-                                                {getStatusBadge(booking.status)}
-                                                <div className="text-right">
-                                                    <div className="font-bold text-blue-600">${booking.total_amount.toFixed(2)}</div>
-                                                    <div className="text-xs text-gray-500">{booking.nights} nights</div>
+                                {bookings.length === 0 ? (
+                                    <div className="text-center py-8 text-gray-500">
+                                        <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                                        <p>No booking requests found</p>
+                                    </div>
+                                ) : (
+                                    bookings.map((booking) => (
+                                        <div
+                                            key={booking.id}
+                                            className={`p-4 rounded-lg border cursor-pointer transition-all ${
+                                                selectedBooking === booking.id
+                                                    ? 'border-primary bg-primary/5'
+                                                    : 'border-border hover:border-border/80'
+                                            }`}
+                                            onClick={() => setSelectedBooking(booking.id)}
+                                        >
+                                            <div className="flex items-start justify-between mb-3">
+                                                <div>
+                                                    <h3 className="font-semibold text-lg">{booking.guest_name}</h3>
+                                                    <p className="text-sm text-gray-600">{booking.room_type}</p>
+                                                </div>
+                                                <div className="flex flex-col items-end gap-2">
+                                                    {getStatusBadge(booking.status)}
+                                                    <div className="text-right">
+                                                        <div className="font-bold text-blue-600">${Number(booking.total_amount).toFixed(2)}</div>
+                                                        <div className="text-xs text-gray-500">{booking.nights} nights</div>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                        
-                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600 mb-3">
-                                            <div className="flex items-center space-x-1">
-                                                <Calendar className="h-4 w-4" />
-                                                <span>{booking.check_in}</span>
+                                            
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600 mb-3">
+                                                <div className="flex items-center space-x-1">
+                                                    <Calendar className="h-4 w-4" />
+                                                    <span>{booking.check_in}</span>
+                                                </div>
+                                                <div className="flex items-center space-x-1">
+                                                    <Calendar className="h-4 w-4" />
+                                                    <span>{booking.check_out}</span>
+                                                </div>
+                                                <div className="flex items-center space-x-1">
+                                                    <Users className="h-4 w-4" />
+                                                    <span>{booking.adults + booking.children} guests</span>
+                                                </div>
+                                                <div className="flex items-center space-x-1">
+                                                    <Clock className="h-4 w-4" />
+                                                    <span>{booking.booking_date}</span>
+                                                </div>
                                             </div>
-                                            <div className="flex items-center space-x-1">
-                                                <Calendar className="h-4 w-4" />
-                                                <span>{booking.check_out}</span>
-                                            </div>
-                                            <div className="flex items-center space-x-1">
-                                                <Users className="h-4 w-4" />
-                                                <span>{booking.adults + booking.children} guests</span>
-                                            </div>
-                                            <div className="flex items-center space-x-1">
-                                                <Clock className="h-4 w-4" />
-                                                <span>{booking.booking_date}</span>
-                                            </div>
-                                        </div>
 
-                                        {booking.special_requests && (
-                                            <div className="bg-muted p-2 rounded text-sm">
-                                                <strong>Special Requests:</strong> {booking.special_requests}
-                                            </div>
-                                        )}
+                                            {booking.special_requests && (
+                                                <div className="bg-muted p-2 rounded text-sm">
+                                                    <strong>Special Requests:</strong> {booking.special_requests}
+                                                </div>
+                                            )}
 
-                                        {selectedBooking === booking.id && (
-                                            <div className="mt-3 flex gap-2">
-                                                <Button 
-                                                    size="sm" 
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleBookingAction(booking.id, 'confirm');
-                                                    }}
-                                                    disabled={booking.status !== 'pending'}
-                                                    className="bg-green-600 hover:bg-green-700"
-                                                >
-                                                    <Check className="h-4 w-4 mr-1" />
-                                                    Confirm
-                                                </Button>
-                                                <Button 
-                                                    variant="destructive" 
-                                                    size="sm"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleBookingAction(booking.id, 'reject');
-                                                    }}
-                                                    disabled={booking.status !== 'pending'}
-                                                >
-                                                    <X className="h-4 w-4 mr-1" />
-                                                    Reject
-                                                </Button>
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
+                                            {selectedBooking === booking.id && booking.status === 'pending' && (
+                                                <div className="mt-3 flex gap-2">
+                                                    <Button 
+                                                        size="sm" 
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleBookingAction(booking.id, 'confirm');
+                                                        }}
+                                                        disabled={loading}
+                                                        className="bg-green-600 hover:bg-green-700"
+                                                    >
+                                                        <Check className="h-4 w-4 mr-1" />
+                                                        Confirm
+                                                    </Button>
+                                                    <Button 
+                                                        variant="destructive" 
+                                                        size="sm"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleBookingAction(booking.id, 'reject');
+                                                        }}
+                                                        disabled={loading}
+                                                    >
+                                                        <X className="h-4 w-4 mr-1" />
+                                                        Reject
+                                                    </Button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))
+                                )}
                             </CardContent>
                         </Card>
                     </div>
@@ -363,23 +401,6 @@ export default function AdminBookingManagement() {
 
                                         <Separator />
 
-                                        {/* Stay Details */}
-                                        <div className="space-y-2">
-                                            <h4 className="font-medium flex items-center gap-2">
-                                                <Bed className="h-4 w-4" />
-                                                Stay Details
-                                            </h4>
-                                            <div className="space-y-1 text-sm">
-                                                <p><strong>Room:</strong> {selectedBookingData.room_type}</p>
-                                                <p><strong>Check-in:</strong> {selectedBookingData.check_in}</p>
-                                                <p><strong>Check-out:</strong> {selectedBookingData.check_out}</p>
-                                                <p><strong>Guests:</strong> {selectedBookingData.adults} adults, {selectedBookingData.children} children</p>
-                                                <p><strong>Source:</strong> {selectedBookingData.booking_source}</p>
-                                            </div>
-                                        </div>
-
-                                        <Separator />
-
                                         {/* Pricing */}
                                         <div className="space-y-2">
                                             <h4 className="font-medium flex items-center gap-2">
@@ -398,7 +419,7 @@ export default function AdminBookingManagement() {
                                                 <Separator />
                                                 <div className="flex justify-between font-semibold">
                                                     <span>Total:</span>
-                                                    <span>${selectedBookingData.total_amount.toFixed(2)}</span>
+                                                    <span>${Number(selectedBookingData.total_amount).toFixed(2)}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -422,6 +443,7 @@ export default function AdminBookingManagement() {
                                                     <Button 
                                                         className="w-full bg-green-600 hover:bg-green-700"
                                                         onClick={() => handleBookingAction(selectedBookingData.id, 'confirm')}
+                                                        disabled={loading}
                                                     >
                                                         <Check className="h-4 w-4 mr-2" />
                                                         Confirm Booking
@@ -430,6 +452,7 @@ export default function AdminBookingManagement() {
                                                         variant="destructive" 
                                                         className="w-full"
                                                         onClick={() => handleBookingAction(selectedBookingData.id, 'reject')}
+                                                        disabled={loading}
                                                     >
                                                         <X className="h-4 w-4 mr-2" />
                                                         Reject Booking
@@ -455,15 +478,17 @@ export default function AdminBookingManagement() {
                             <CardContent className="space-y-3">
                                 <div className="flex items-center justify-between text-sm">
                                     <span>New Requests</span>
-                                    <Badge variant="secondary">3</Badge>
+                                    <Badge variant="secondary">{stats.todayRequests || 0}</Badge>
                                 </div>
                                 <div className="flex items-center justify-between text-sm">
                                     <span>Processed Today</span>
-                                    <Badge variant="default">7</Badge>
+                                    <Badge variant="default">{stats.todayProcessed || 0}</Badge>
                                 </div>
                                 <div className="flex items-center justify-between text-sm">
-                                    <span>Response Time</span>
-                                    <span className="text-green-600"> 2 hours</span>
+                                    <span>Pending Review</span>
+                                    <Badge variant="secondary" className="bg-yellow-50 text-yellow-700">
+                                        {stats.pendingBookings}
+                                    </Badge>
                                 </div>
                             </CardContent>
                         </Card>
@@ -472,4 +497,4 @@ export default function AdminBookingManagement() {
             </div>
         </AppLayout>
     );
-}
+}                       

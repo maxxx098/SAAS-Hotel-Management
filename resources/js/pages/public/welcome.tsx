@@ -1,9 +1,10 @@
 import { type SharedData } from '@/types';
-import { Head, Link, usePage } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import Layout from '@/components/layout';
 import { 
     Users, 
     Bed, 
@@ -89,60 +90,11 @@ export default function Welcome() {
     ];
 
     return (
-        <div className="min-h-screen bg-background text-foreground">
-            <Head title="Welcome">
-                <link rel="preconnect" href="https://fonts.bunny.net" />
-                <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600" rel="stylesheet" />
-            </Head>
-
-            {/* Header */}
-            <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-                <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
-                    <div className="flex h-16 items-center justify-between">
-                        <Link href="/" className="flex items-center gap-2">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600">
-                                <Building className="h-6 w-6 text-white" />
-                            </div>
-                            <span className="text-xl font-bold">HotelManager</span>
-                        </Link>
-                        <nav className="flex items-center gap-4">
-                            <Button variant="ghost" asChild>
-                                <Link href={route('rooms.index')}>
-                                    Our Rooms
-                                </Link>
-                            </Button>
-                            {auth.user ? (
-                                <Button asChild>
-                                    <Link href={route('dashboard')}>
-                                        Dashboard <ArrowRight className="ml-2 h-4 w-4" />
-                                    </Link>
-                                </Button>
-                            ) : (
-                                <>
-                                    <Button variant="ghost" asChild>
-                                        <Link href={route('login')}>
-                                            Log in
-                                        </Link>
-                                    </Button>
-                                    <Button asChild>
-                                        <Link href={route('register')}>
-                                            Get Started <ArrowRight className="ml-2 h-4 w-4" />
-                                        </Link>
-                                    </Button>
-                                </>
-                            )}
-                        </nav>
-                    </div>
-                </div>
-            </header>
-
+        <Layout title="Welcome">
             {/* Hero Section */}
             <section className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl py-20 sm:py-32">
                 <div className="text-center space-y-8">
                     <div className="space-y-4">
-                        <Badge variant="secondary" className="bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-                            Trusted by 2,500+ Hotels Worldwide
-                        </Badge>
                         <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight">
                             Streamline Your{' '}
                             <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">
@@ -156,15 +108,15 @@ export default function Welcome() {
                     
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                         {!auth.user && (
-                            <Button size="lg" className="text-lg px-8 py-6 h-auto" asChild>
+                            <Button className="px-6 py-2" asChild>
                                 <Link href={route('register')}>
                                     Start Free Trial
-                                    <ArrowRight className="ml-2 h-5 w-5" />
+                                    <ArrowRight className="ml-2 h-4 w-4" />
                                 </Link>
                             </Button>
                         )}
-                        <Button size="lg" variant="outline" className="text-lg px-8 py-6 h-auto">
-                            <PlayCircle className="mr-2 h-5 w-5" />
+                        <Button variant="outline" className="px-6 py-2">
+                            <PlayCircle className="mr-2 h-4 w-4" />
                             View Demo
                         </Button>
                     </div>
@@ -249,15 +201,15 @@ export default function Welcome() {
                         
                         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                             {!auth.user && (
-                                <Button size="lg" className="text-lg px-8 py-6 h-auto" asChild>
+                                <Button className="px-6 py-2" asChild>
                                     <Link href={route('register')}>
                                         Get Started Free
-                                        <ArrowRight className="ml-2 h-5 w-5" />
+                                        <ArrowRight className="ml-2 h-4 w-4" />
                                     </Link>
                                 </Button>
                             )}
-                            <Button size="lg" variant="outline" className="text-lg px-8 py-6 h-auto">
-                                <Globe className="mr-2 h-5 w-5" />
+                            <Button variant="outline" className="px-6 py-2">
+                                <Globe className="mr-2 h-4 w-4" />
                                 Learn More
                             </Button>
                         </div>
@@ -281,26 +233,6 @@ export default function Welcome() {
                     </CardContent>
                 </Card>
             </section>
-
-            {/* Footer */}
-            <footer className="border-t border-border bg-muted/50">
-                <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl py-12">
-                    <div className="flex flex-col sm:flex-row items-center justify-between space-y-4 sm:space-y-0">
-                        <Link href="/" className="flex items-center gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600">
-                                <Building className="h-5 w-5 text-white" />
-                            </div>
-                            <span className="text-lg font-bold">HotelManager</span>
-                        </Link>
-                        <div className="flex items-center gap-6 text-sm text-muted-foreground">
-                            <span>© 2024 HotelManager. All rights reserved.</span>
-                            <Separator orientation="vertical" className="h-4" />
-                            <Link href="#" className="hover:text-foreground transition-colors">Privacy</Link>
-                            <Link href="#" className="hover:text-foreground transition-colors">Terms</Link>
-                        </div>
-                    </div>
-                </div>
-            </footer>
-        </div>
+        </Layout>
     );
 }

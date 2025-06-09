@@ -652,7 +652,7 @@ export default function AdminRoomsManagement({ rooms, filters, roomTypes }: Prop
                                             <Button 
                                                 className="w-full" 
                                                 variant="outline"
-                                                onClick={() => handleEdit(selectedRoomData)}
+                                                onClick={() => selectedRoomData && handleEdit(selectedRoomData)}
                                             >
                                                 <Edit className="h-4 w-4 mr-2" />
                                                 Edit Room

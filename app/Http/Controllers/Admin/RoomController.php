@@ -39,7 +39,7 @@ class RoomController extends Controller
 
         $rooms = $query->latest()->paginate(10)->withQueryString();
 
-        return Inertia::render('admin/rooms/index', [
+        return Inertia::render('dashboard/admin/rooms/index', [
             'rooms' => $rooms,
             'filters' => $request->only(['search', 'type', 'availability']),
             'roomTypes' => ['single', 'double', 'suite', 'family', 'deluxe'],
@@ -51,7 +51,7 @@ class RoomController extends Controller
      */
     public function create(): Response
     {
-        return Inertia::render('admin/rooms/create', [
+        return Inertia::render('dashboard/admin/rooms/create', [
             'roomTypes' => ['single', 'double', 'suite', 'family', 'deluxe'],
             'amenitiesOptions' => [
                 'wifi' => 'Wi-Fi',
@@ -110,7 +110,7 @@ class RoomController extends Controller
      */
     public function edit(Room $room): Response
     {
-        return Inertia::render('Admin/Rooms/Edit', [
+        return Inertia::render('dashboard/admin/rooms/edit', [
             'room' => $room,
             'roomTypes' => ['single', 'double', 'suite', 'family', 'deluxe'],
             'amenitiesOptions' => [

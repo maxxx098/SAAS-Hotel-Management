@@ -1,13 +1,13 @@
 <?php
 // app/Http/Controllers/RoomController.php
-// This is for the public-facing rooms page
-
 namespace App\Http\Controllers;
 
 use App\Models\Room;
+use App\Models\Booking;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Carbon\Carbon;
 
 class RoomController extends Controller
 {
@@ -47,7 +47,7 @@ class RoomController extends Controller
                       ->paginate(12)
                       ->withQueryString();
 
-        return Inertia::render('rooms', [
+        return Inertia::render('public/rooms/index', [
             'rooms' => $rooms,
             'filters' => $request->only(['search', 'type', 'availability']),
             'roomTypes' => ['single', 'double', 'suite', 'family', 'deluxe'],
@@ -55,7 +55,7 @@ class RoomController extends Controller
     }
 
     /**
-     * Display a specific room
+     * Display a specific room with booking availability
      */
     public function show(Room $room): Response
     {
@@ -64,13 +64,39 @@ class RoomController extends Controller
             abort(404);
         }
 
-        return Inertia::render('Rooms/Show', [
+        // Get related rooms
+        $relatedRooms = Room::where('is_active', true)
+            ->where('type', $room->type)
+            ->where('id', '!=', $room->id)
+            ->limit(3)
+            ->get(['id', 'name', 'price_per_night', 'images', 'type']);
+
+        // Get unavailable dates for the next 6 months
+        $unavailableDates = Booking::where('room_id', $room->id)
+            ->whereIn('status', ['confirmed', 'pending'])
+            ->where('check_out', '>=', now())
+            ->where('check_in', '<=', now()->addMonths(6))
+            ->get(['check_in', 'check_out'])
+            ->map(function ($booking) {
+                $dates = [];
+                $current = Carbon::parse($booking->check_in);
+                $end = Carbon::parse($booking->check_out);
+                
+                while ($current->lt($end)) {
+                    $dates[] = $current->format('Y-m-d');
+                    $current->addDay();
+                }
+                
+                return $dates;
+            })
+            ->flatten()
+            ->unique()
+            ->values();
+
+        return Inertia::render('public/rooms/show', [
             'room' => $room,
-            'relatedRooms' => Room::where('is_active', true)
-                ->where('type', $room->type)
-                ->where('id', '!=', $room->id)
-                ->limit(3)
-                ->get(),
+            'relatedRooms' => $relatedRooms,
+            'unavailableDates' => $unavailableDates,
         ]);
     }
 }
