@@ -30,6 +30,12 @@ class DatabaseSeeder extends Seeder
             'password' => Hash::make('userpassword'),
             'role' => 'user',
         ]);
+        User::factory()->create([
+            'name' => 'Regular User',
+            'email' => 'symonfalcatan08@gmail.com',
+            'password' => Hash::make('userpassword'),
+            'role' => 'user',
+        ]);
 
         // Optionally create more users
         // User::factory(10)->create();

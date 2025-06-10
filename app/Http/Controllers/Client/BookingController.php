@@ -49,7 +49,7 @@ class BookingController extends Controller
 
         $booking->load('room:id,name,type,description,images,amenities');
 
-        return Inertia::render('bookings/show', [
+        return Inertia::render('public/rooms/index', [
             'booking' => $booking,
         ]);
     }

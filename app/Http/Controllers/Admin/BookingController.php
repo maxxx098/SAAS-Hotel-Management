@@ -9,6 +9,8 @@ use Illuminate\Http\JsonResponse;
 use Inertia\Inertia;
 use Inertia\Response;
 use Illuminate\Support\Facades\DB;
+use App\Mail\BookingConfirmed;
+use Illuminate\Support\Facades\Mail;
 
 class BookingController extends Controller
 {
@@ -60,32 +62,29 @@ class BookingController extends Controller
     /**
      * Update booking status.
      */
-    public function updateStatus(Request $request, Booking $booking): JsonResponse
-    {
-        $request->validate([
-            'status' => 'required|in:pending,confirmed,rejected',
-        ]);
+public function updateStatus(Request $request, Booking $booking): JsonResponse
+{
+    $request->validate([
+        'status' => 'required|in:pending,confirmed,rejected',
+    ]);
 
-        $booking->update([
-            'status' => $request->status,
-            'updated_at' => now(),
-        ]);
+    $booking->update([
+        'status' => $request->status,
+        'updated_at' => now(),
+    ]);
 
-        // You might want to send notifications here
-        // if ($request->status === 'confirmed') {
-        //     // Send confirmation email
-        // } elseif ($request->status === 'rejected') {
-        //     // Send rejection email
-        // }
-
-        return response()->json([
-            'message' => 'Booking status updated successfully',
-            'booking' => [
-                'id' => $booking->id,
-                'status' => $booking->status,
-            ],
-        ]);
+    if ($request->status === 'confirmed') {
+        Mail::to($booking->user->email ?? $booking->guest_email)->send(new BookingConfirmed($booking));
     }
+
+    return response()->json([
+        'message' => 'Booking status updated successfully',
+        'booking' => [
+            'id' => $booking->id,
+            'status' => $booking->status,
+        ],
+    ]);
+}
 
     /**
      * Get booking details.
