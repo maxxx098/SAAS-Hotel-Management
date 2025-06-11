@@ -9,9 +9,8 @@ use Illuminate\Http\JsonResponse;
 use Inertia\Inertia;
 use Inertia\Response;
 use Illuminate\Support\Facades\DB;
-use App\Mail\BookingConfirmed;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
+use Resend\Laravel\Facades\Resend;
 use Exception;
 
 class BookingController extends Controller
@@ -97,7 +96,7 @@ class BookingController extends Controller
             ]);
 
             // Send confirmation email if status is confirmed
-           if ($validated['status'] === 'confirmed') {
+            if ($validated['status'] === 'confirmed') {
                 try {
                     // Better email priority logic
                     $emailAddress = null;
@@ -114,7 +113,7 @@ class BookingController extends Controller
                     }
                     
                     if ($emailAddress) {
-                        Log::info('Sending confirmation email', [
+                        Log::info('Sending confirmation email via Resend', [
                             'booking_id' => $booking->id,
                             'email' => $emailAddress,
                             'email_source' => $emailSource,
@@ -131,10 +130,10 @@ class BookingController extends Controller
                             throw new \Exception('Invalid email format: ' . $emailAddress);
                         }
                         
-                        // Send the email
-                        Mail::to($emailAddress)->send(new BookingConfirmed($booking));
+                        // Send email using Resend
+                        $this->sendBookingConfirmationEmail($booking, $emailAddress);
                         
-                        Log::info('Email sent successfully', [
+                        Log::info('Email sent successfully via Resend', [
                             'booking_id' => $booking->id,
                             'email' => $emailAddress,
                             'email_source' => $emailSource,
@@ -148,7 +147,7 @@ class BookingController extends Controller
                         ]);
                     }
                 } catch (Exception $e) {
-                    Log::error('Failed to send confirmation email', [
+                    Log::error('Failed to send confirmation email via Resend', [
                         'booking_id' => $booking->id,
                         'email' => $emailAddress ?? 'unknown',
                         'error' => $e->getMessage(),
@@ -177,7 +176,6 @@ class BookingController extends Controller
                 ],
             ], 200);
 
-
         } catch (\Illuminate\Validation\ValidationException $e) {
             DB::rollBack();
             return response()->json([
@@ -200,6 +198,166 @@ class BookingController extends Controller
                 'error' => config('app.debug') ? $e->getMessage() : null,
             ], 500);
         }
+    }
+
+    /**
+     * Send booking confirmation email using Resend
+     */
+    private function sendBookingConfirmationEmail(Booking $booking, string $emailAddress): void
+    {
+        // Load relationships if not already loaded
+        $booking->load(['user', 'room']);
+        
+        // Get guest name for display
+        $guestName = $booking->user->name ?? $booking->guest_name ?? 'Guest';
+        
+        // Format dates for display
+        $checkInDate = $booking->check_in->format('F j, Y');
+        $checkOutDate = $booking->check_out->format('F j, Y');
+        $nights = $booking->check_in->diffInDays($booking->check_out);
+        
+        // Build email HTML content
+        $emailHtml = $this->buildConfirmationEmailHtml($booking, $guestName, $checkInDate, $checkOutDate, $nights);
+        
+        // Send email via Resend
+        $result = Resend::emails()->send([
+            'from' => config('mail.from.address', 'bookings@yourhotel.com'),
+            'to' => [$emailAddress],
+            'subject' => 'Booking Confirmation - Your Reservation is Confirmed!',
+            'html' => $emailHtml,
+            'reply_to' => config('mail.from.address', 'bookings@yourhotel.com'),
+            'tags' => [
+                ['name' => 'category', 'value' => 'booking_confirmation'],
+                ['name' => 'booking_id', 'value' => (string) $booking->id]
+            ]
+        ]);
+        
+        Log::info('Resend API response', [
+            'booking_id' => $booking->id,
+            'email' => $emailAddress,
+            'resend_id' => $result['id'] ?? 'unknown'
+        ]);
+    }
+
+    /**
+     * Build HTML content for booking confirmation email
+     */
+    private function buildConfirmationEmailHtml(Booking $booking, string $guestName, string $checkInDate, string $checkOutDate, int $nights): string
+    {
+        $roomType = $booking->room->name ?? $booking->room_type ?? 'Room';
+        $totalAmount = number_format($booking->total_amount, 2);
+        $bookingId = $booking->id;
+
+        return "
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset='utf-8'>
+            <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+            <title>Booking Confirmation</title>
+            <style>
+                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px 20px; text-align: center; border-radius: 10px 10px 0 0; }
+                .content { background: #ffffff; padding: 30px 20px; border: 1px solid #e0e0e0; }
+                .booking-details { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }
+                .detail-row { display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee; }
+                .detail-label { font-weight: bold; color: #555; }
+                .detail-value { color: #333; }
+                .highlight { background: #e8f5e8; padding: 15px; border-left: 4px solid #28a745; margin: 20px 0; border-radius: 4px; }
+                .footer { background: #f8f9fa; padding: 20px; text-align: center; color: #666; border-radius: 0 0 10px 10px; }
+                .button { display: inline-block; background: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 10px 0; }
+            </style>
+        </head>
+        <body>
+            <div class='container'>
+                <div class='header'>
+                    <h1>🎉 Booking Confirmed!</h1>
+                    <p>Thank you for choosing us, {$guestName}!</p>
+                </div>
+                
+                <div class='content'>
+                    <div class='highlight'>
+                        <strong>✅ Your booking has been confirmed!</strong><br>
+                        Booking Reference: <strong>#{$bookingId}</strong>
+                    </div>
+                    
+                    <h3>📋 Booking Details</h3>
+                    <div class='booking-details'>
+                        <div class='detail-row'>
+                            <span class='detail-label'>Guest Name:</span>
+                            <span class='detail-value'>{$guestName}</span>
+                        </div>
+                        <div class='detail-row'>
+                            <span class='detail-label'>Room Type:</span>
+                            <span class='detail-value'>{$roomType}</span>
+                        </div>
+                        <div class='detail-row'>
+                            <span class='detail-label'>Check-in Date:</span>
+                            <span class='detail-value'>{$checkInDate}</span>
+                        </div>
+                        <div class='detail-row'>
+                            <span class='detail-label'>Check-out Date:</span>
+                            <span class='detail-value'>{$checkOutDate}</span>
+                        </div>
+                        <div class='detail-row'>
+                            <span class='detail-label'>Number of Nights:</span>
+                            <span class='detail-value'>{$nights} night" . ($nights > 1 ? 's' : '') . "</span>
+                        </div>
+                        <div class='detail-row'>
+                            <span class='detail-label'>Adults:</span>
+                            <span class='detail-value'>{$booking->adults}</span>
+                        </div>";
+                        
+        if ($booking->children > 0) {
+            $emailHtml .= "
+                        <div class='detail-row'>
+                            <span class='detail-label'>Children:</span>
+                            <span class='detail-value'>{$booking->children}</span>
+                        </div>";
+        }
+        
+        if ($booking->special_requests) {
+            $emailHtml .= "
+                        <div class='detail-row'>
+                            <span class='detail-label'>Special Requests:</span>
+                            <span class='detail-value'>{$booking->special_requests}</span>
+                        </div>";
+        }
+        
+        $emailHtml .= "
+                        <div class='detail-row' style='border-bottom: 2px solid #28a745; font-size: 18px; font-weight: bold;'>
+                            <span class='detail-label'>Total Amount:</span>
+                            <span class='detail-value'>₱{$totalAmount}</span>
+                        </div>
+                    </div>
+                    
+                    <h3>📝 What's Next?</h3>
+                    <ul>
+                        <li>Save this confirmation email for your records</li>
+                        <li>Arrive at the hotel by 3:00 PM on your check-in date</li>
+                        <li>Present a valid ID at check-in</li>
+                        <li>Contact us if you need to make any changes</li>
+                    </ul>
+                    
+                    <h3>📞 Need Help?</h3>
+                    <p>If you have any questions or need to make changes to your booking, please contact us:</p>
+                    <ul>
+                        <li>📧 Email: reservations@yourhotel.com</li>
+                        <li>📱 Phone: +63 123 456 7890</li>
+                        <li>🕒 Available 24/7</li>
+                    </ul>
+                </div>
+                
+                <div class='footer'>
+                    <p>Thank you for choosing us! We look forward to welcoming you.</p>
+                    <p><small>This is an automated confirmation email. Please do not reply to this email.</small></p>
+                </div>
+            </div>
+        </body>
+        </html>";
+
+        return $emailHtml;
     }
 
     /**

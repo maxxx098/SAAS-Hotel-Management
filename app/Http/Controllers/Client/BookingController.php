@@ -59,6 +59,8 @@ class BookingController extends Controller
  */
 public function store(Request $request)
 {
+    $user = Auth::user();
+
     $request->validate([
         'room_id' => 'required|exists:rooms,id',
         'check_in' => 'required|date|after:today',
@@ -70,6 +72,8 @@ public function store(Request $request)
         'guest_phone' => 'required|string|max:20',
         'special_requests' => 'nullable|string|max:1000',
     ]);
+
+    $notificationEmail = $user ? $user->email : $request->guest_email;
 
     $room = Room::findOrFail($request->room_id);
 
@@ -145,6 +149,7 @@ public function store(Request $request)
             'status' => 'pending',
             'special_requests' => $request->special_requests,
             'booking_source' => 'website',
+            'notification_email' => $notificationEmail,
         ]);
 
         DB::commit();
