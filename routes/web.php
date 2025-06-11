@@ -4,6 +4,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Client\BookingController;
 use App\Http\Controllers\Admin\BookingController as AdminBookingController;
 use App\Http\Controllers\Admin\RoomController as AdminRoomController;
+use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\RoomController;
 use Illuminate\Foundation\Application;
@@ -26,9 +27,14 @@ Route::get('/rooms/{room}', [RoomController::class, 'show'])->name('rooms.show')
 Route::post('/auth/google', [GoogleAuthController::class, 'handleGoogleLogin'])->name('google.login');
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::get('dashboard/index', function () {
-        return Inertia::render('dashboard/index');
-    })->name('dashboard');
+    // Single dashboard for both roles
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    
+    // Dashboard API routes - accessible to both roles
+    Route::get('/dashboard/stats', [DashboardController::class, 'stats'])->name('dashboard.stats');
+    Route::get('/dashboard/recent-bookings', [DashboardController::class, 'recentBookings'])->name('dashboard.recent-bookings');
+    Route::get('/dashboard/monthly-revenue', [DashboardController::class, 'monthlyRevenue'])->name('dashboard.monthly-revenue');
+    Route::get('/dashboard/room-distribution', [DashboardController::class, 'roomTypeDistribution'])->name('dashboard.room-distribution');
     
     // User/Client bookings routes
     Route::get('/bookings', [BookingController::class, 'index'])->name('bookings');
@@ -37,22 +43,25 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('/bookings/{booking}/status', [BookingController::class, 'updateStatus'])->name('bookings.update-status');
     Route::get('/bookings/stats/dashboard', [BookingController::class, 'stats'])->name('bookings.stats');
     Route::get('/bookings/{booking}/confirmation', [BookingController::class, 'confirmation'])->name('bookings.confirmation');
-    // Additional booking utility routes
     Route::post('/bookings/check-availability', [BookingController::class, 'checkAvailability'])->name('bookings.check-availability');
-    
-    // Admin routes
+
+    // Admin-only routes
     Route::middleware(['admin'])->prefix('admin')->name('admin.')->group(function () {
-        Route::get('dashboard', function () {
-            return Inertia::render('dashboard/admin/index');
-        })->name('dashboard');
-        
+
+        Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    
+        // Dashboard API routes - accessible to both roles
+        Route::get('/dashboard/stats', [DashboardController::class, 'stats'])->name('dashboard.stats');
+        Route::get('/dashboard/recent-bookings', [DashboardController::class, 'recentBookings'])->name('dashboard.recent-bookings');
+        Route::get('/dashboard/monthly-revenue', [DashboardController::class, 'monthlyRevenue'])->name('dashboard.monthly-revenue');
+        Route::get('/dashboard/room-distribution', [DashboardController::class, 'roomTypeDistribution'])->name('dashboard.room-distribution');
         // Admin bookings routes
-        Route::get('bookings', [AdminBookingController::class, 'index'])->name('bookings');
-        Route::get('bookings/{booking}', [AdminBookingController::class, 'show'])->name('bookings.show');
-        Route::patch('bookings/{booking}/status', [AdminBookingController::class, 'updateStatus'])->name('bookings.update-status');
-        Route::get('bookings/stats', [AdminBookingController::class, 'stats'])->name('bookings.stats');
+        Route::get('/bookings', [AdminBookingController::class, 'index'])->name('bookings');
+        Route::get('/bookings/{booking}', [AdminBookingController::class, 'show'])->name('bookings.show');
+        Route::patch('/bookings/{booking}/status', [AdminBookingController::class, 'updateStatus'])->name('bookings.update-status');
+        Route::get('/bookings/stats', [AdminBookingController::class, 'stats'])->name('bookings.stats');
         
-        // Admin rooms resource routes (use AdminRoomController)
+        // Admin rooms resource routes
         Route::resource('rooms', AdminRoomController::class);
     });
 });

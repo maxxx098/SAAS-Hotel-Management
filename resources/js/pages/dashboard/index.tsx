@@ -1,7 +1,8 @@
 import { PlaceholderPattern } from '@/components/ui/placeholder-pattern';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/react';
+import { Head, usePage } from '@inertiajs/react';
+import { router } from '@inertiajs/react';
 import { 
     Users, 
     Bed, 
@@ -21,6 +22,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { useState, useEffect } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -29,35 +31,266 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-// Mock data - replace with actual data from your backend
-const dashboardData = {
-    stats: {
-        totalRooms: 150,
-        occupiedRooms: 128,
-        availableRooms: 22,
-        revenue: 45230,
-        checkInsToday: 18,
-        checkOutsToday: 15,
-        avgRating: 4.6,
-        staffOnDuty: 24
-    },
-    occupancyRate: 85.3,
-    revenueGrowth: 12.5,
-    recentBookings: [
-        { id: 1, guest: 'John Smith', room: '301', checkIn: '2024-06-07', status: 'confirmed' },
-        { id: 2, guest: 'Sarah Johnson', room: '205', checkIn: '2024-06-07', status: 'pending' },
-        { id: 3, guest: 'Mike Wilson', room: '412', checkIn: '2024-06-08', status: 'confirmed' },
-        { id: 4, guest: 'Emma Davis', room: '108', checkIn: '2024-06-08', status: 'confirmed' },
-    ],
-    maintenanceRequests: [
+interface DashboardStats {
+    totalBookings: number;
+    pendingBookings: number;
+    confirmedBookings: number;
+    rejectedBookings: number;
+    totalRevenue: number;
+    avgBookingValue: number;
+    todayRequests: number;
+    todayProcessed: number;
+    revenueGrowth: number;
+}
+
+interface RecentBooking {
+    id: number;
+    guest_name: string;
+    room_type: string;
+    check_in: string;
+    status: 'pending' | 'confirmed' | 'rejected';
+    total_amount: number;
+}
+
+interface MaintenanceRequest {
+    id: number;
+    room: string;
+    issue: string;
+    priority: 'high' | 'medium' | 'low';
+    status: 'pending' | 'in-progress' | 'completed';
+}
+
+interface DashboardData {
+    bookingStats: DashboardStats;
+    recentBookings: RecentBooking[];
+    totalRooms?: number;
+    occupiedRooms?: number;
+    availableRooms?: number;
+    occupancyRate?: number;
+    revenueGrowth?: number;
+    avgRating?: number;
+    staffOnDuty?: number;
+    checkInsToday?: number;
+    checkOutsToday?: number;
+}
+
+interface PageProps {
+    dashboardData?: DashboardData;
+    userRole: string;
+    isAdmin: boolean;
+    error?: string;
+    [key: string]: unknown;
+}
+
+export default function Dashboard() {
+    const { props } = usePage<PageProps>();
+    const { userRole, isAdmin, error: serverError } = props;
+    
+    const [dashboardData, setDashboardData] = useState<DashboardData>({
+        bookingStats: {
+            totalBookings: 0,
+            pendingBookings: 0,
+            confirmedBookings: 0,
+            rejectedBookings: 0,
+            totalRevenue: 0,
+            avgBookingValue: 0,
+            todayRequests: 0,
+            todayProcessed: 0,
+            revenueGrowth: 0,
+        },
+        recentBookings: [],
+        // Admin-specific defaults
+        ...(isAdmin && {
+            totalRooms: 150,
+            occupiedRooms: 0,
+            availableRooms: 0,
+            occupancyRate: 0,
+            revenueGrowth: 12.5,
+            avgRating: 4.6,
+            staffOnDuty: 24,
+            checkInsToday: 0,
+            checkOutsToday: 0,
+        }),
+    });
+
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(serverError || null);
+
+    // Mock maintenance requests - keeping static as not in controller
+    const maintenanceRequests: MaintenanceRequest[] = [
         { id: 1, room: '205', issue: 'AC not working', priority: 'high', status: 'pending' },
         { id: 2, room: '314', issue: 'Leaky faucet', priority: 'medium', status: 'in-progress' },
         { id: 3, room: '107', issue: 'Light bulb replacement', priority: 'low', status: 'completed' },
-    ]
-};
+    ];
 
-export default function Dashboard() {
-    const { stats, occupancyRate, revenueGrowth, recentBookings, maintenanceRequests } = dashboardData;
+    useEffect(() => {
+        fetchDashboardData();
+    }, []);
+
+const fetchDashboardData = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+
+            // Determine the correct endpoint based on user role
+            const baseUrl = isAdmin ? '/admin/dashboard' : '/dashboard';
+
+            // Fetch dashboard statistics
+            const statsResponse = await fetch(`${baseUrl}/stats`, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                },
+            });
+
+            if (!statsResponse.ok) {
+                throw new Error(`HTTP error! status: ${statsResponse.status}`);
+            }
+
+            const statsData = await statsResponse.json();
+
+            if (!statsData.success) {
+                throw new Error(statsData.message || 'Failed to fetch dashboard statistics');
+            }
+
+            // Fetch recent bookings
+            const bookingsResponse = await fetch(`${baseUrl}/recent-bookings`, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                },
+            });
+
+            let recentBookings: RecentBooking[] = [];
+            if (bookingsResponse.ok) {
+                const bookingsData = await bookingsResponse.json();
+                if (bookingsData.success) {
+                    recentBookings = bookingsData.recentBookings || [];
+                }
+            }
+
+            // Use the booking stats from the API
+            const bookingStats = statsData.stats;
+            
+            // Calculate room stats (admin-specific)
+            let adminSpecificData = {};
+            if (isAdmin) {
+                const totalRooms = 150; // You can make this dynamic by adding it to your controller
+                const occupiedRooms = bookingStats.confirmedBookings || 0;
+                const availableRooms = Math.max(0, totalRooms - occupiedRooms);
+                const occupancyRate = totalRooms > 0 ? Math.round((occupiedRooms / totalRooms) * 100 * 10) / 10 : 0;
+
+                adminSpecificData = {
+                    totalRooms,
+                    occupiedRooms,
+                    availableRooms,
+                    occupancyRate,
+                    revenueGrowth: bookingStats.revenueGrowth || 12.5,
+                    avgRating: 4.6, // Static value - you can add this to your controller
+                    staffOnDuty: 24, // Static value - you can add this to your controller
+                    checkInsToday: bookingStats.todayProcessed || 0,
+                    checkOutsToday: Math.floor(bookingStats.todayProcessed * 0.8) || 0,
+                };
+            }
+
+            setDashboardData({
+                bookingStats,
+                recentBookings,
+                ...adminSpecificData,
+            });
+
+        } catch (err) {
+            console.error('Dashboard data fetch error:', err);
+            setError(err instanceof Error ? err.message : 'Failed to fetch dashboard data');
+        } finally {
+            setLoading(false);
+        }
+    };
+const handleQuickAction = (action: string) => {
+        const baseRoute = isAdmin ? '/admin' : '';
+        
+        switch (action) {
+            case 'new-checkin':
+                router.visit(`${baseRoute}/bookings?status=confirmed`);
+                break;
+            case 'room-management':
+                if (isAdmin) {
+                    router.visit('/admin/rooms');
+                } else {
+                    router.visit('/rooms');
+                }
+                break;
+            case 'report-issue':
+                // Handle maintenance report
+                alert('Maintenance reporting feature coming soon!');
+                break;
+            case 'guest-directory':
+                router.visit(`${baseRoute}/bookings`);
+                break;
+            case 'new-booking':
+                router.visit('/rooms'); // For regular users
+                break;
+            case 'my-bookings':
+                router.visit('/bookings'); // For regular users
+                break;
+        }
+    };
+
+    if (loading) {
+        return (
+            <AppLayout breadcrumbs={breadcrumbs}>
+                <Head title="Dashboard" />
+                <div className="flex h-full flex-1 flex-col gap-6 rounded-xl p-6">
+                    <div className="flex items-center justify-center h-64">
+                        <div className="text-center">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                            <p className="text-muted-foreground">Loading dashboard data...</p>
+                        </div>
+                    </div>
+                </div>
+            </AppLayout>
+        );
+    }
+
+    if (error) {
+        return (
+            <AppLayout breadcrumbs={breadcrumbs}>
+                <Head title="Dashboard" />
+                <div className="flex h-full flex-1 flex-col gap-6 rounded-xl p-6">
+                    <div className="flex items-center justify-center h-64">
+                        <div className="text-center">
+                            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+                            <p className="text-red-600 mb-2">Error loading dashboard</p>
+                            <p className="text-muted-foreground text-sm">{error}</p>
+                            <button 
+                                onClick={fetchDashboardData}
+                                className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+                            >
+                                Retry
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </AppLayout>
+        );
+    }
+
+    const { bookingStats, recentBookings } = dashboardData;
+    
+    // Admin-specific data
+    const { 
+        totalRooms = 0, 
+        occupiedRooms = 0, 
+        availableRooms = 0, 
+        occupancyRate = 0, 
+        revenueGrowth = 0, 
+        avgRating = 0, 
+        staffOnDuty = 0, 
+        checkInsToday = 0, 
+        checkOutsToday = 0 
+    } = dashboardData;
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -88,7 +321,7 @@ export default function Dashboard() {
                             <DollarSign className="h-4 w-4 text-muted-foreground" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold">${stats.revenue.toLocaleString()}</div>
+                            <div className="text-2xl font-bold">₱{bookingStats.totalRevenue.toLocaleString()}</div>
                             <div className="flex items-center text-xs text-muted-foreground">
                                 <TrendingUp className="mr-1 h-3 w-3 text-green-500" />
                                 +{revenueGrowth}% from last month
@@ -104,7 +337,7 @@ export default function Dashboard() {
                         <CardContent>
                             <div className="text-2xl font-bold">{occupancyRate}%</div>
                             <div className="text-xs text-muted-foreground">
-                                {stats.occupiedRooms}/{stats.totalRooms} rooms occupied
+                                {occupiedRooms}/{totalRooms} rooms occupied
                             </div>
                             <Progress value={occupancyRate} className="mt-2" />
                         </CardContent>
@@ -116,9 +349,9 @@ export default function Dashboard() {
                             <UserCheck className="h-4 w-4 text-muted-foreground" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold">{stats.checkInsToday}</div>
+                            <div className="text-2xl font-bold">{checkInsToday}</div>
                             <div className="text-xs text-muted-foreground">
-                                {stats.checkOutsToday} check-outs scheduled
+                                {checkOutsToday} check-outs scheduled
                             </div>
                         </CardContent>
                     </Card>
@@ -129,7 +362,7 @@ export default function Dashboard() {
                             <Star className="h-4 w-4 text-muted-foreground" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold">{stats.avgRating}/5</div>
+                            <div className="text-2xl font-bold">{avgRating}/5</div>
                             <div className="flex items-center text-xs text-muted-foreground">
                                 <TrendingUp className="mr-1 h-3 w-3 text-green-500" />
                                 +0.2 from last month
@@ -152,22 +385,36 @@ export default function Dashboard() {
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-4">
-                                {recentBookings.map((booking) => (
-                                    <div key={booking.id} className="flex items-center justify-between p-3 rounded-lg border">
-                                        <div className="flex items-center gap-3">
-                                            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                                                <Users className="h-4 w-4" />
+                                {recentBookings.length > 0 ? (
+                                    recentBookings.map((booking) => (
+                                        <div key={booking.id} className="flex items-center justify-between p-3 rounded-lg border">
+                                            <div className="flex items-center gap-3">
+                                                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                                                    <Users className="h-4 w-4" />
+                                                </div>
+                                                <div>
+                                                    <p className="font-medium">{booking.guest_name}</p>
+                                                    <p className="text-sm text-muted-foreground">
+                                                        {booking.room_type} • {new Date(booking.check_in).toLocaleDateString()}
+                                                    </p>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <p className="font-medium">{booking.guest}</p>
-                                                <p className="text-sm text-muted-foreground">Room {booking.room} • {booking.checkIn}</p>
+                                            <div className="text-right">
+                                                <Badge variant={booking.status === 'confirmed' ? 'default' : booking.status === 'pending' ? 'secondary' : 'destructive'}>
+                                                    {booking.status}
+                                                </Badge>
+                                                <p className="text-sm text-muted-foreground mt-1">
+                                                    ₱{booking.total_amount.toLocaleString()}
+                                                </p>
                                             </div>
                                         </div>
-                                        <Badge variant={booking.status === 'confirmed' ? 'default' : 'secondary'}>
-                                            {booking.status}
-                                        </Badge>
+                                    ))
+                                ) : (
+                                    <div className="text-center py-8 text-muted-foreground">
+                                        <Calendar className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                                        <p>No recent bookings</p>
                                     </div>
-                                ))}
+                                )}
                             </div>
                         </CardContent>
                     </Card>
@@ -186,14 +433,14 @@ export default function Dashboard() {
                                     <div className="h-3 w-3 rounded-full bg-green-500"></div>
                                     <span className="text-sm">Available</span>
                                 </div>
-                                <span className="font-medium">{stats.availableRooms}</span>
+                                <span className="font-medium">{availableRooms}</span>
                             </div>
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <div className="h-3 w-3 rounded-full bg-red-500"></div>
                                     <span className="text-sm">Occupied</span>
                                 </div>
-                                <span className="font-medium">{stats.occupiedRooms}</span>
+                                <span className="font-medium">{occupiedRooms}</span>
                             </div>
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
@@ -253,7 +500,7 @@ export default function Dashboard() {
                         <CardContent className="space-y-4">
                             <div className="flex items-center justify-between">
                                 <span className="text-sm">On Duty</span>
-                                <span className="font-medium">{stats.staffOnDuty}</span>
+                                <span className="font-medium">{staffOnDuty}</span>
                             </div>
                             <div className="flex items-center justify-between">
                                 <span className="text-sm">Front Desk</span>
@@ -280,19 +527,31 @@ export default function Dashboard() {
                             <CardTitle>Quick Actions</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-2">
-                            <button className="w-full flex items-center gap-2 p-2 rounded-lg border hover:bg-accent transition-colors">
+                            <button 
+                                onClick={() => handleQuickAction('new-checkin')}
+                                className="w-full flex items-center gap-2 p-2 rounded-lg border hover:bg-accent transition-colors"
+                            >
                                 <UserCheck className="h-4 w-4" />
                                 <span className="text-sm">New Check-in</span>
                             </button>
-                            <button className="w-full flex items-center gap-2 p-2 rounded-lg border hover:bg-accent transition-colors">
+                            <button 
+                                onClick={() => handleQuickAction('room-management')}
+                                className="w-full flex items-center gap-2 p-2 rounded-lg border hover:bg-accent transition-colors"
+                            >
                                 <Bed className="h-4 w-4" />
                                 <span className="text-sm">Room Management</span>
                             </button>
-                            <button className="w-full flex items-center gap-2 p-2 rounded-lg border hover:bg-accent transition-colors">
+                            <button 
+                                onClick={() => handleQuickAction('report-issue')}
+                                className="w-full flex items-center gap-2 p-2 rounded-lg border hover:bg-accent transition-colors"
+                            >
                                 <AlertCircle className="h-4 w-4" />
                                 <span className="text-sm">Report Issue</span>
                             </button>
-                            <button className="w-full flex items-center gap-2 p-2 rounded-lg border hover:bg-accent transition-colors">
+                            <button 
+                                onClick={() => handleQuickAction('guest-directory')}
+                                className="w-full flex items-center gap-2 p-2 rounded-lg border hover:bg-accent transition-colors"
+                            >
                                 <Users className="h-4 w-4" />
                                 <span className="text-sm">Guest Directory</span>
                             </button>
@@ -343,6 +602,34 @@ export default function Dashboard() {
                                     <p className="font-medium">Pool</p>
                                     <p className="text-sm text-yellow-600">Maintenance</p>
                                 </div>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Booking Statistics Summary */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Booking Overview</CardTitle>
+                        <CardDescription>Summary of all booking activities</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                            <div className="text-center">
+                                <div className="text-2xl font-bold text-blue-600">{bookingStats.totalBookings}</div>
+                                <p className="text-sm text-muted-foreground">Total Bookings</p>
+                            </div>
+                            <div className="text-center">
+                                <div className="text-2xl font-bold text-yellow-600">{bookingStats.pendingBookings}</div>
+                                <p className="text-sm text-muted-foreground">Pending</p>
+                            </div>
+                            <div className="text-center">
+                                <div className="text-2xl font-bold text-green-600">{bookingStats.confirmedBookings}</div>
+                                <p className="text-sm text-muted-foreground">Confirmed</p>
+                            </div>
+                            <div className="text-center">
+                                <div className="text-2xl font-bold text-muted-foreground">₱{bookingStats.avgBookingValue.toLocaleString()}</div>
+                                <p className="text-sm text-muted-foreground">Avg. Booking Value</p>
                             </div>
                         </div>
                     </CardContent>
