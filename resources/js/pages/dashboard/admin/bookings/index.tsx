@@ -93,74 +93,138 @@ export default function AdminBookingManagement({ bookings: initialBookings, stat
     const [loading, setLoading] = useState(false);
     const { toast } = useToast();
 
-    const handleBookingAction = async (bookingId: number, action: 'confirm' | 'reject') => {
-        setLoading(true);
+    // Helper function to format currency
+    const formatCurrency = (amount: number): string => {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+        }).format(Math.round(amount));
+    };
+
+    // Replace your handleBookingAction function with this improved version
+const handleBookingAction = async (bookingId: number, action: 'confirm' | 'reject') => {
+    setLoading(true);
+    
+    try {
+        // Get fresh CSRF token from multiple possible sources
+        let csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
         
-        try {
-            const response = await fetch(`/admin/bookings/${bookingId}/status`, {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                },
-                body: JSON.stringify({
-                    status: action === 'confirm' ? 'confirmed' : 'rejected',
-                }),
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to update booking status');
+        // If meta tag token is not found, try getting from cookie
+        if (!csrfToken) {
+            const cookies = document.cookie.split(';');
+            const xsrfCookie = cookies.find(cookie => cookie.trim().startsWith('XSRF-TOKEN='));
+            if (xsrfCookie) {
+                csrfToken = decodeURIComponent(xsrfCookie.split('=')[1]);
             }
+        }
+        
+        // If still no token, try getting from Laravel's global
+        if (!csrfToken && (window as any).Laravel?.csrfToken) {
+            csrfToken = (window as any).Laravel.csrfToken;
+        }
+        
+        if (!csrfToken) {
+            // Last resort: refresh the page to get a new token
+            window.location.reload();
+            return;
+        }
 
-            // Update local state
-            setBookings(prev => prev.map(booking => 
-                booking.id === bookingId 
-                    ? { ...booking, status: action === 'confirm' ? 'confirmed' : 'rejected' }
-                    : booking
-            ));
+        const response = await fetch(`/admin/bookings/${bookingId}/status`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest', // Important for Laravel
+            },
+            credentials: 'same-origin', // Include cookies
+            body: JSON.stringify({
+                status: action === 'confirm' ? 'confirmed' : 'rejected',
+            }),
+        });
 
-            // Update stats
-            setStats(prev => {
-                const newStats = { ...prev };
-                const booking = bookings.find(b => b.id === bookingId);
-                
-                if (booking && booking.status === 'pending') {
-                    newStats.pendingBookings -= 1;
-                    if (action === 'confirm') {
-                        newStats.confirmedBookings += 1;
-                        newStats.totalRevenue += booking.total_amount;
-                    } else {
-                        newStats.rejectedBookings += 1;
-                    }
-                    
-                    // Recalculate average
-                    const confirmedBookings = bookings.filter(b => 
-                        b.status === 'confirmed' || (b.id === bookingId && action === 'confirm')
-                    );
-                    newStats.avgBookingValue = confirmedBookings.length > 0 
-                        ? newStats.totalRevenue / confirmedBookings.length 
-                        : 0;
-                }
-                
-                return newStats;
-            });
+        const data = await response.json();
 
-            setSelectedBooking(null);
-            
+        // Handle CSRF token mismatch specifically
+        if (response.status === 419 || (data.message && data.message.includes('CSRF'))) {
             toast({
-                title: 'Success',
-                description: `Booking ${action === 'confirm' ? 'confirmed' : 'rejected'} successfully`,
-            });
-        } catch (error) {
-            toast({
-                title: 'Error',
-                description: 'Failed to update booking status',
+                title: 'Session Expired',
+                description: 'Please refresh the page and try again',
                 variant: 'destructive',
             });
-        } finally {
-            setLoading(false);
+            // Refresh the page to get new CSRF token
+            setTimeout(() => window.location.reload(), 2000);
+            return;
         }
-    };
+
+        if (!response.ok) {
+            throw new Error(data.message || 'Failed to update booking status');
+        }
+
+        // Update the meta tag with potentially new token from response
+        if (data.csrf_token) {
+            const metaTag = document.querySelector('meta[name="csrf-token"]');
+            if (metaTag) {
+                metaTag.setAttribute('content', data.csrf_token);
+            }
+        }
+
+        // Find the booking being updated
+        const bookingToUpdate = bookings.find(b => b.id === bookingId);
+        if (!bookingToUpdate) {
+            throw new Error('Booking not found');
+        }
+
+        // Update local state
+        setBookings(prev => prev.map(booking => 
+            booking.id === bookingId 
+                ? { ...booking, status: action === 'confirm' ? 'confirmed' : 'rejected' }
+                : booking
+        ));
+
+        // Update stats correctly
+        setStats(prev => {
+            const newStats = { ...prev };
+            
+            // Only update if the booking was previously pending
+            if (bookingToUpdate.status === 'pending') {
+                newStats.pendingBookings = Math.max(0, newStats.pendingBookings - 1);
+                
+                if (action === 'confirm') {
+                    newStats.confirmedBookings += 1;
+                    newStats.totalRevenue += bookingToUpdate.total_amount;
+                    
+                    // Recalculate average booking value
+                    newStats.avgBookingValue = newStats.confirmedBookings > 0 
+                        ? newStats.totalRevenue / newStats.confirmedBookings 
+                        : 0;
+                } else {
+                    newStats.rejectedBookings += 1;
+                }
+            }
+            
+            return newStats;
+        });
+
+        setSelectedBooking(null);
+        
+        toast({
+            title: 'Success',
+            description: `Booking ${action === 'confirm' ? 'confirmed' : 'rejected'} successfully`,
+        });
+    } catch (error) {
+        console.error('Error updating booking:', error);
+        toast({
+            title: 'Error',
+            description: error instanceof Error ? error.message : 'Failed to update booking status',
+            variant: 'destructive',
+        });
+    } finally {
+        setLoading(false);
+    }
+};
 
     const refreshData = () => {
         router.reload({ only: ['bookings', 'stats'] });
@@ -256,9 +320,9 @@ export default function AdminBookingManagement({ bookings: initialBookings, stat
                             <DollarSign className="h-4 w-4 text-muted-foreground" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold">${stats.totalRevenue.toLocaleString()}</div>
+                            <div className="text-2xl font-bold">{formatCurrency(stats.totalRevenue)}</div>
                             <div className="text-xs text-muted-foreground">
-                                Avg: ${stats.avgBookingValue.toFixed(0)} per booking
+                                Avg: {formatCurrency(stats.avgBookingValue)} per booking
                             </div>
                         </CardContent>
                     </Card>
@@ -302,7 +366,7 @@ export default function AdminBookingManagement({ bookings: initialBookings, stat
                                                 <div className="flex flex-col items-end gap-2">
                                                     {getStatusBadge(booking.status)}
                                                     <div className="text-right">
-                                                        <div className="font-bold text-blue-600">${Number(booking.total_amount).toFixed(2)}</div>
+                                                        <div className="font-bold text-blue-600">{formatCurrency(booking.total_amount)}</div>
                                                         <div className="text-xs text-gray-500">{booking.nights} nights</div>
                                                     </div>
                                                 </div>
@@ -410,16 +474,16 @@ export default function AdminBookingManagement({ bookings: initialBookings, stat
                                             <div className="space-y-1 text-sm">
                                                 <div className="flex justify-between">
                                                     <span>Room rate × {selectedBookingData.nights} nights:</span>
-                                                    <span>${(selectedBookingData.room_price * selectedBookingData.nights).toFixed(2)}</span>
+                                                    <span>{formatCurrency(selectedBookingData.room_price * selectedBookingData.nights)}</span>
                                                 </div>
                                                 <div className="flex justify-between">
                                                     <span>Taxes & fees:</span>
-                                                    <span>${(selectedBookingData.total_amount - (selectedBookingData.room_price * selectedBookingData.nights)).toFixed(2)}</span>
+                                                    <span>{formatCurrency(selectedBookingData.total_amount - (selectedBookingData.room_price * selectedBookingData.nights))}</span>
                                                 </div>
                                                 <Separator />
                                                 <div className="flex justify-between font-semibold">
                                                     <span>Total:</span>
-                                                    <span>${Number(selectedBookingData.total_amount).toFixed(2)}</span>
+                                                    <span>{formatCurrency(selectedBookingData.total_amount)}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -497,4 +561,4 @@ export default function AdminBookingManagement({ bookings: initialBookings, stat
             </div>
         </AppLayout>
     );
-}                       
+}

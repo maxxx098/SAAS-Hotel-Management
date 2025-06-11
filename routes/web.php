@@ -32,7 +32,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     
     // User/Client bookings routes
     Route::get('/bookings', [BookingController::class, 'index'])->name('bookings');
-    Route::post('/bookings', [BookingController::class, 'store'])->name('bookings.store'); // ADDED: Missing POST route
+    Route::post('/bookings', [BookingController::class, 'store'])->name('bookings.store'); 
     Route::get('/bookings/{booking}', [BookingController::class, 'show'])->name('bookings.show');
     Route::patch('/bookings/{booking}/status', [BookingController::class, 'updateStatus'])->name('bookings.update-status');
     Route::get('/bookings/stats/dashboard', [BookingController::class, 'stats'])->name('bookings.stats');
