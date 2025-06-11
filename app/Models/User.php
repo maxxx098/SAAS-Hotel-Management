@@ -21,7 +21,8 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
-        'role', // Add this
+        'role',
+        'google_id', // Add this for Google OAuth
     ];
 
     /**
@@ -32,6 +33,7 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'google_id', // Hide Google ID from JSON responses
     ];
 
     /**
@@ -74,5 +76,22 @@ class User extends Authenticatable
             'user' => 'User',
             default => 'Unknown'
         };
+    }
+
+    /**
+     * Check if user has Google account linked
+     */
+    public function hasGoogleAccount(): bool
+    {
+        return !is_null($this->google_id);
+    }
+
+    /**
+     * Check if user can unlink Google account
+     * (only if they have a password set)
+     */
+    public function canUnlinkGoogle(): bool
+    {
+        return $this->hasGoogleAccount() && !is_null($this->password);
     }
 }

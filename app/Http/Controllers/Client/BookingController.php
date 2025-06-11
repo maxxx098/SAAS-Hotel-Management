@@ -84,16 +84,33 @@ public function store(Request $request)
         return back()->withErrors(['capacity' => 'Number of guests exceeds room capacity.']);
     }
 
-    // Check for conflicting bookings
+    // FIXED: Check for conflicting bookings with correct date overlap logic
+    $checkIn = Carbon::parse($request->check_in);
+    $checkOut = Carbon::parse($request->check_out);
+    
     $conflictingBookings = Booking::where('room_id', $request->room_id)
         ->whereIn('status', ['confirmed', 'pending'])
-        ->where(function ($query) use ($request) {
-            $query->whereBetween('check_in', [$request->check_in, $request->check_out])
-                  ->orWhereBetween('check_out', [$request->check_in, $request->check_out])
-                  ->orWhere(function ($q) use ($request) {
-                      $q->where('check_in', '<=', $request->check_in)
-                        ->where('check_out', '>=', $request->check_out);
-                  });
+        ->where(function ($query) use ($checkIn, $checkOut) {
+            // Case 1: New booking starts during existing booking
+            $query->where(function ($q) use ($checkIn, $checkOut) {
+                $q->where('check_in', '<', $checkIn)
+                  ->where('check_out', '>', $checkIn);
+            })
+            // Case 2: New booking ends during existing booking
+            ->orWhere(function ($q) use ($checkIn, $checkOut) {
+                $q->where('check_in', '<', $checkOut)
+                  ->where('check_out', '>', $checkOut);
+            })
+            // Case 3: New booking completely contains existing booking
+            ->orWhere(function ($q) use ($checkIn, $checkOut) {
+                $q->where('check_in', '>=', $checkIn)
+                  ->where('check_out', '<=', $checkOut);
+            })
+            // Case 4: Existing booking completely contains new booking
+            ->orWhere(function ($q) use ($checkIn, $checkOut) {
+                $q->where('check_in', '<=', $checkIn)
+                  ->where('check_out', '>=', $checkOut);
+            });
         })
         ->exists();
 
@@ -102,9 +119,11 @@ public function store(Request $request)
     }
 
     // Calculate total amount
-    $checkIn = Carbon::parse($request->check_in);
-    $checkOut = Carbon::parse($request->check_out);
     $nights = $checkIn->diffInDays($checkOut);
+    if ($nights <= 0) {
+        return back()->withErrors(['dates' => 'Check-out date must be after check-in date.']);
+    }
+    
     $totalAmount = $nights * $room->price_per_night;
 
     try {
@@ -116,8 +135,8 @@ public function store(Request $request)
             'guest_name' => $request->guest_name,
             'guest_email' => $request->guest_email,
             'guest_phone' => $request->guest_phone,
-            'check_in' => $request->check_in,
-            'check_out' => $request->check_out,
+            'check_in' => $checkIn->format('Y-m-d'),
+            'check_out' => $checkOut->format('Y-m-d'),
             'adults' => $request->adults,
             'children' => $request->children ?? 0,
             'room_type' => $room->type,
@@ -130,43 +149,81 @@ public function store(Request $request)
 
         DB::commit();
 
-        // For Inertia.js, use redirect with route name
-        return redirect()->route('bookings.show', $booking)
-                       ->with('success', 'Booking submitted successfully! We will confirm your reservation shortly.');
+        // Redirect to confirmation page
+        return redirect()->route('bookings.confirmation', $booking);
 
     } catch (\Exception $e) {
         DB::rollBack();
+        
+        // Log the error for debugging
+        \Log::error('Booking creation failed: ' . $e->getMessage(), [
+            'request_data' => $request->all(),
+            'user_id' => Auth::id(),
+            'error' => $e->getTraceAsString()
+        ]);
+        
         return back()->withErrors(['error' => 'Failed to create booking. Please try again.']);
     }
 }
-    /**
-     * Check room availability for given dates
-     */
-    public function checkAvailability(Request $request)
-    {
-        $request->validate([
-            'room_id' => 'required|exists:rooms,id',
-            'check_in' => 'required|date|after:today',
-            'check_out' => 'required|date|after:check_in',
-        ]);
 
-        $conflictingBookings = Booking::where('room_id', $request->room_id)
-            ->whereIn('status', ['confirmed', 'pending'])
-            ->where(function ($query) use ($request) {
-                $query->whereBetween('check_in', [$request->check_in, $request->check_out])
-                      ->orWhereBetween('check_out', [$request->check_in, $request->check_out])
-                      ->orWhere(function ($q) use ($request) {
-                          $q->where('check_in', '<=', $request->check_in)
-                            ->where('check_out', '>=', $request->check_out);
-                      });
-            })
-            ->exists();
-
-        return response()->json([
-            'available' => !$conflictingBookings,
-        ]);
+public function confirmation(Booking $booking): Response
+{
+    // Ensure user can only view their own booking confirmation
+    if ($booking->user_id !== Auth::id()) {
+        abort(403);
     }
 
+    $booking->load('room:id,name,type,images');
+
+    return Inertia::render('confirmation/booking/index', [
+        'booking' => $booking,
+    ]);
+}
+    /**
+ * Check room availability for given dates
+ */
+public function checkAvailability(Request $request)
+{
+    $request->validate([
+        'room_id' => 'required|exists:rooms,id',
+        'check_in' => 'required|date|after:today',
+        'check_out' => 'required|date|after:check_in',
+    ]);
+
+    $checkIn = Carbon::parse($request->check_in);
+    $checkOut = Carbon::parse($request->check_out);
+
+    $conflictingBookings = Booking::where('room_id', $request->room_id)
+        ->whereIn('status', ['confirmed', 'pending'])
+        ->where(function ($query) use ($checkIn, $checkOut) {
+            // Case 1: New booking starts during existing booking
+            $query->where(function ($q) use ($checkIn, $checkOut) {
+                $q->where('check_in', '<', $checkIn)
+                  ->where('check_out', '>', $checkIn);
+            })
+            // Case 2: New booking ends during existing booking
+            ->orWhere(function ($q) use ($checkIn, $checkOut) {
+                $q->where('check_in', '<', $checkOut)
+                  ->where('check_out', '>', $checkOut);
+            })
+            // Case 3: New booking completely contains existing booking
+            ->orWhere(function ($q) use ($checkIn, $checkOut) {
+                $q->where('check_in', '>=', $checkIn)
+                  ->where('check_out', '<=', $checkOut);
+            })
+            // Case 4: Existing booking completely contains new booking
+            ->orWhere(function ($q) use ($checkIn, $checkOut) {
+                $q->where('check_in', '<=', $checkIn)
+                  ->where('check_out', '>=', $checkOut);
+            });
+        })
+        ->exists();
+
+    return response()->json([
+        'available' => !$conflictingBookings,
+        'message' => $conflictingBookings ? 'Room is not available for selected dates' : 'Room is available'
+    ]);
+}
     /**
      * Get booking statistics for dashboard
      */

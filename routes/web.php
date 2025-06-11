@@ -4,6 +4,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Client\BookingController;
 use App\Http\Controllers\Admin\BookingController as AdminBookingController;
 use App\Http\Controllers\Admin\RoomController as AdminRoomController;
+use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\RoomController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
@@ -22,6 +23,8 @@ Route::get('/', function () {
 Route::get('/rooms', [RoomController::class, 'index'])->name('rooms.index');
 Route::get('/rooms/{room}', [RoomController::class, 'show'])->name('rooms.show');
 
+Route::post('/auth/google', [GoogleAuthController::class, 'handleGoogleLogin'])->name('google.login');
+
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard/index', function () {
         return Inertia::render('dashboard/index');
@@ -33,7 +36,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/bookings/{booking}', [BookingController::class, 'show'])->name('bookings.show');
     Route::patch('/bookings/{booking}/status', [BookingController::class, 'updateStatus'])->name('bookings.update-status');
     Route::get('/bookings/stats/dashboard', [BookingController::class, 'stats'])->name('bookings.stats');
-    
+    Route::get('/bookings/{booking}/confirmation', [BookingController::class, 'confirmation'])->name('bookings.confirmation');
     // Additional booking utility routes
     Route::post('/bookings/check-availability', [BookingController::class, 'checkAvailability'])->name('bookings.check-availability');
     

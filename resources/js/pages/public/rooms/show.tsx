@@ -57,11 +57,17 @@ export const Calendar: React.FC<CalendarProps> = ({
         a.getMonth() === b.getMonth() &&
         a.getDate() === b.getDate();
 
-    // Get the weekday of the first day of the month (0 = Sunday)
     const firstDayOfWeek = startOfMonth.getDay();
 
+    const handleDateSelect = (day: Date) => {
+        if (!disabled?.(day)) {
+            onSelect?.(day);
+        }
+    };
+
+
     return (
-        <div className="p-4 bg-background rounded-lg shadow-md w-72">
+       <div className="p-4 bg-background rounded-lg shadow-md w-72">
             <div className="flex items-center justify-between mb-2">
                 <button
                     type="button"
@@ -69,7 +75,7 @@ export const Calendar: React.FC<CalendarProps> = ({
                     className="px-2 py-1 rounded hover:bg-muted"
                     aria-label="Previous month"
                 >
-                    &lt;
+                    ‹
                 </button>
                 <span className="font-semibold">
                     {currentMonth.toLocaleString('default', { month: 'long', year: 'numeric' })}
@@ -80,18 +86,17 @@ export const Calendar: React.FC<CalendarProps> = ({
                     className="px-2 py-1 rounded hover:bg-muted"
                     aria-label="Next month"
                 >
-                    &gt;
+                    ›
                 </button>
             </div>
             <div className="grid grid-cols-7 gap-1 text-xs text-center mb-1">
                 {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((d) => (
-                    <div key={d} className="font-medium">{d}</div>
+                    <div key={d} className="font-medium p-1">{d}</div>
                 ))}
             </div>
             <div className="grid grid-cols-7 gap-1">
-                {/* Empty cells for days before the first of the month */}
                 {Array.from({ length: firstDayOfWeek }).map((_, i) => (
-                    <div key={`empty-${i}`} />
+                    <div key={`empty-${i}`} className="h-8" />
                 ))}
                 {days.map((day) => {
                     const isDisabled = disabled?.(day);
@@ -101,11 +106,14 @@ export const Calendar: React.FC<CalendarProps> = ({
                             key={day.toISOString()}
                             type="button"
                             disabled={isDisabled}
-                            onClick={() => !isDisabled && onSelect?.(day)}
-                            className={`rounded-full w-8 h-8 flex items-center justify-center
-                                ${isSelected ? 'bg-primary text-white' : ''}
-                                ${isDisabled ? 'opacity-30 cursor-not-allowed' : 'hover:bg-muted'}
-                            `}
+                            onClick={() => handleDateSelect(day)}
+                            className={cn(
+                                "h-8 w-8 rounded-md text-sm flex items-center justify-center transition-colors",
+                                isSelected 
+                                    ? "bg-primary text-primary-foreground font-medium" 
+                                    : "hover:bg-accent hover:text-accent-foreground",
+                                isDisabled && "opacity-30 cursor-not-allowed hover:bg-transparent"
+                            )}
                         >
                             {day.getDate()}
                         </button>
@@ -113,6 +121,7 @@ export const Calendar: React.FC<CalendarProps> = ({
                 })}
             </div>
         </div>
+
     );
 };
 
@@ -143,8 +152,12 @@ export const PopoverTrigger: React.FC<{
 }> = ({ children, isOpen, setIsOpen }) => {
     return (
         <div 
-            className="inline-block"
-            onClick={() => setIsOpen?.(!isOpen)}
+            className="inline-block cursor-pointer"
+            onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsOpen?.(!isOpen);
+            }}
         >
             {children}
         </div>
@@ -160,7 +173,6 @@ export const PopoverContent: React.FC<{
 }> = ({ children, className = '', align = 'start', isOpen, setIsOpen }) => {
     const ref = React.useRef<HTMLDivElement>(null);
     
-    // Close on click outside
     React.useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (ref.current && !ref.current.contains(event.target as Node)) {
@@ -183,7 +195,7 @@ export const PopoverContent: React.FC<{
         <div
             ref={ref}
             className={cn(
-                "absolute z-50 mt-2 bg-popover text-popover-foreground border rounded-md shadow-lg",
+                "absolute z-50 mt-2 bg-popover text-popover-foreground border rounded-md shadow-lg p-0",
                 align === 'start' && "left-0",
                 align === 'center' && "left-1/2 -translate-x-1/2",
                 align === 'end' && "right-0",
@@ -543,64 +555,83 @@ export default function RoomShowPage({ room, relatedRooms, unavailableDates }: R
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleSubmit} className="space-y-4">
-                    {/* Check-in Date */}
-                    <div className="space-y-2">
-                      <Label>Check-in Date</Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className={cn(
-                              "w-full justify-start text-left font-normal",
-                              !checkIn && "text-muted-foreground"
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {checkIn ? format(checkIn, 'PPP') : 'Select date'}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={checkIn}
-                            onSelect={setCheckIn}
-                            disabled={isDateUnavailable}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                    </div>
+                      {/* Check-in Date */}
+                      <div className="space-y-2">
+                        <Label>Check-in Date</Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                "w-full justify-start text-left font-normal",
+                                !checkIn && "text-muted-foreground"
+                              )}
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {checkIn ? format(checkIn, 'PPP') : 'Select date'}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={checkIn}
+                              onSelect={(date) => {
+                                setCheckIn(date);
+                                // Auto-close popover after selection
+                                setTimeout(() => {
+                                  const popover = document.querySelector('[data-popover-content]');
+                                  if (popover) {
+                                    const event = new MouseEvent('click', { bubbles: true });
+                                    document.dispatchEvent(event);
+                                  }
+                                }, 100);
+                              }}
+                              disabled={isDateUnavailable}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
 
-                    {/* Check-out Date */}
-                    <div className="space-y-2">
-                      <Label>Check-out Date</Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className={cn(
-                              "w-full justify-start text-left font-normal",
-                              !checkOut && "text-muted-foreground"
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {checkOut ? format(checkOut, 'PPP') : 'Select date'}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={checkOut}
-                            onSelect={setCheckOut}
-                            disabled={(date: number | Date) => {
-                              const d = typeof date === 'number' ? new Date(date) : date;
-                              return isDateUnavailable(d) || (checkIn ? d <= checkIn : false);
-                            }}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                    </div>
+                      {/* Check-out Date */}
+                      <div className="space-y-2">
+                        <Label>Check-out Date</Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                "w-full justify-start text-left font-normal",
+                                !checkOut && "text-muted-foreground"
+                              )}
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {checkOut ? format(checkOut, 'PPP') : 'Select date'}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={checkOut}
+                              onSelect={(date) => {
+                                setCheckOut(date);
+                                // Auto-close popover after selection
+                                setTimeout(() => {
+                                  const popover = document.querySelector('[data-popover-content]');
+                                  if (popover) {
+                                    const event = new MouseEvent('click', { bubbles: true });
+                                    document.dispatchEvent(event);
+                                  }
+                                }, 100);
+                              }}
+                              disabled={(date: Date) => {
+                                return isDateUnavailable(date) || (checkIn ? date <= checkIn : false);
+                              }}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
 
                     {/* Guests */}
                     <div className="grid grid-cols-2 gap-4">
@@ -649,8 +680,10 @@ export default function RoomShowPage({ room, relatedRooms, unavailableDates }: R
                     <div className="space-y-2">
                       <Label>Phone Number</Label>
                       <Input
+                        type="tel"
                         value={guestPhone}
                         onChange={(e) => setGuestPhone(e.target.value)}
+                        placeholder="Enter your phone number"
                         required
                       />
                     </div>
