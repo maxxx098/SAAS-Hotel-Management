@@ -306,7 +306,7 @@ class DashboardController extends Controller
     }
 
 /**
- * Get user dashboard data - FIXED VERSION
+ * Get user dashboard data 
  */
 private function getUserDashboardData(int $userId): array
 {
@@ -326,7 +326,7 @@ private function getUserDashboardData(int $userId): array
 }
 
 /**
- * Get comprehensive user statistics - NEW METHOD
+ * Get comprehensive user statistics 
  */
 private function getUserStats(int $userId): array
 {
@@ -370,7 +370,7 @@ private function getUserStats(int $userId): array
 }
 
 /**
- * Get upcoming bookings for user - NEW METHOD
+ * Get upcoming bookings for user
  */
 private function getUserUpcomingBookingsData(int $userId): array
 {
@@ -408,7 +408,7 @@ private function getUserUpcomingBookingsData(int $userId): array
 }
 
 /**
- * Get membership tier based on total spent - NEW METHOD
+ * Get membership tier based on total spent 
  */
 private function getMembershipTier(float $totalSpent): string
 {
@@ -481,7 +481,7 @@ private function getDefaultHotelServices(): array
 }
 
 /**
- * Get empty user stats - NEW METHOD
+ * Get empty user stats 
  */
 private function getEmptyUserStats(): array
 {
@@ -496,7 +496,7 @@ private function getEmptyUserStats(): array
     ];
 }
 /**
- * Get recent bookings for a specific user - NEW METHOD
+ * Get recent bookings for a specific user 
  */
 private function getUserRecentBookingsData(int $userId): array
 {
@@ -529,7 +529,7 @@ private function getUserRecentBookingsData(int $userId): array
 }
 
 /**
- * Get admin booking statistics - MISSING METHOD
+ * Get admin booking statistics 
  */
 private function getBookingStats(): array
 {
@@ -567,7 +567,7 @@ private function getBookingStats(): array
 }
 
 /**
- * Get user booking statistics - MISSING METHOD
+ * Get user booking statistics 
  */
 private function getUserBookingStats(int $userId): array
 {
@@ -603,7 +603,7 @@ private function getUserBookingStats(int $userId): array
 }
 
 /**
- * Get room statistics - MISSING METHOD
+ * Get room statistics 
  */
 private function getRoomStats(): array
 {
@@ -635,7 +635,7 @@ private function getRoomStats(): array
 }
 
 /**
- * Get recent bookings for admin - MISSING METHOD
+ * Get recent bookings for admin 
  */
 private function getRecentBookingsData(): array
 {
@@ -665,7 +665,7 @@ private function getRecentBookingsData(): array
 }
 
 /**
- * Get empty dashboard data for error states - MISSING METHOD
+ * Get empty dashboard data for error states 
  */
 private function getEmptyDashboardData(): array
 {

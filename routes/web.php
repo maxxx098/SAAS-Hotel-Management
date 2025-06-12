@@ -20,13 +20,14 @@ Route::get('/', function () {
     ]);
 })->name('home');
 
-// Public room routes (use main RoomController)
+// Public room routes 
 Route::get('/rooms', [RoomController::class, 'index'])->name('rooms.index');
 Route::get('/rooms/{room}', [RoomController::class, 'show'])->name('rooms.show');
 
 Route::post('/auth/google', [GoogleAuthController::class, 'handleGoogleLogin'])->name('google.login');
 
 Route::middleware(['auth', 'verified'])->group(function () {
+    
     // Single dashboard for both roles
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     
