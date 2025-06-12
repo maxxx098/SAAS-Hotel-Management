@@ -37,7 +37,11 @@ import {
     Eye,
     Check,
     X,
-    RefreshCw
+    RefreshCw,
+    ChevronLeft,
+    ChevronRight,
+    ChevronsLeft,
+    ChevronsRight
 } from 'lucide-react';
 
 interface Booking {
@@ -92,6 +96,35 @@ export default function AdminBookingManagement({ bookings: initialBookings, stat
     const [stats, setStats] = useState<BookingStats>(initialStats);
     const [loading, setLoading] = useState(false);
     const { toast } = useToast();
+
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState<number>(1);
+    const [itemsPerPage] = useState<number>(2); // Default to 2 bookings per page
+
+    // Calculate pagination
+    const totalPages = Math.ceil(bookings.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const currentBookings = bookings.slice(startIndex, endIndex);
+
+    // Pagination handlers
+    const goToPage = (page: number) => {
+        if (page >= 1 && page <= totalPages) {
+            setCurrentPage(page);
+            setSelectedBooking(null); // Clear selection when changing pages
+        }
+    };
+
+    const goToFirstPage = () => goToPage(1);
+    const goToLastPage = () => goToPage(totalPages);
+    const goToPreviousPage = () => goToPage(currentPage - 1);
+    const goToNextPage = () => goToPage(currentPage + 1);
+
+    // Reset to first page when bookings change
+    useEffect(() => {
+        setCurrentPage(1);
+        setSelectedBooking(null);
+    }, [bookings.length]);
 
     // Helper function to format currency
     const formatCurrency = (amount: number): string => {
@@ -336,6 +369,11 @@ const handleBookingAction = async (bookingId: number, action: 'confirm' | 'rejec
                                 <CardTitle className="flex items-center gap-2">
                                     <Users className="h-5 w-5" />
                                     Booking Requests
+                                    {bookings.length > 0 && (
+                                        <Badge variant="outline" className="ml-auto">
+                                            {startIndex + 1}-{Math.min(endIndex, bookings.length)} of {bookings.length}
+                                        </Badge>
+                                    )}
                                 </CardTitle>
                                 <CardDescription>
                                     Click on a booking to view details and take action
@@ -348,85 +386,161 @@ const handleBookingAction = async (bookingId: number, action: 'confirm' | 'rejec
                                         <p>No booking requests found</p>
                                     </div>
                                 ) : (
-                                    bookings.map((booking) => (
-                                        <div
-                                            key={booking.id}
-                                            className={`p-4 rounded-lg border cursor-pointer transition-all ${
-                                                selectedBooking === booking.id
-                                                    ? 'border-primary bg-primary/5'
-                                                    : 'border-border hover:border-border/80'
-                                            }`}
-                                            onClick={() => setSelectedBooking(booking.id)}
-                                        >
-                                            <div className="flex items-start justify-between mb-3">
-                                                <div>
-                                                    <h3 className="font-semibold text-lg">{booking.guest_name}</h3>
-                                                    <p className="text-sm text-gray-600">{booking.room_type}</p>
-                                                </div>
-                                                <div className="flex flex-col items-end gap-2">
-                                                    {getStatusBadge(booking.status)}
-                                                    <div className="text-right">
-                                                        <div className="font-bold text-blue-600">{formatCurrency(booking.total_amount)}</div>
-                                                        <div className="text-xs text-gray-500">{booking.nights} nights</div>
+                                    <>
+                                        {currentBookings.map((booking) => (
+                                            <div
+                                                key={booking.id}
+                                                className={`p-4 rounded-lg border cursor-pointer transition-all ${
+                                                    selectedBooking === booking.id
+                                                        ? 'border-primary bg-primary/5'
+                                                        : 'border-border hover:border-border/80'
+                                                }`}
+                                                onClick={() => setSelectedBooking(booking.id)}
+                                            >
+                                                <div className="flex items-start justify-between mb-3">
+                                                    <div>
+                                                        <h3 className="font-semibold text-lg">{booking.guest_name}</h3>
+                                                        <p className="text-sm text-gray-600">{booking.room_type}</p>
+                                                    </div>
+                                                    <div className="flex flex-col items-end gap-2">
+                                                        {getStatusBadge(booking.status)}
+                                                        <div className="text-right">
+                                                            <div className="font-bold text-blue-600">{formatCurrency(booking.total_amount)}</div>
+                                                            <div className="text-xs text-gray-500">{booking.nights} nights</div>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                            
-                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600 mb-3">
-                                                <div className="flex items-center space-x-1">
-                                                    <Calendar className="h-4 w-4" />
-                                                    <span>{booking.check_in}</span>
+                                                
+                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600 mb-3">
+                                                    <div className="flex items-center space-x-1">
+                                                        <Calendar className="h-4 w-4" />
+                                                        <span>{booking.check_in}</span>
+                                                    </div>
+                                                    <div className="flex items-center space-x-1">
+                                                        <Calendar className="h-4 w-4" />
+                                                        <span>{booking.check_out}</span>
+                                                    </div>
+                                                    <div className="flex items-center space-x-1">
+                                                        <Users className="h-4 w-4" />
+                                                        <span>{booking.adults + booking.children} guests</span>
+                                                    </div>
+                                                    <div className="flex items-center space-x-1">
+                                                        <Clock className="h-4 w-4" />
+                                                        <span>{booking.booking_date}</span>
+                                                    </div>
                                                 </div>
-                                                <div className="flex items-center space-x-1">
-                                                    <Calendar className="h-4 w-4" />
-                                                    <span>{booking.check_out}</span>
-                                                </div>
-                                                <div className="flex items-center space-x-1">
-                                                    <Users className="h-4 w-4" />
-                                                    <span>{booking.adults + booking.children} guests</span>
-                                                </div>
-                                                <div className="flex items-center space-x-1">
-                                                    <Clock className="h-4 w-4" />
-                                                    <span>{booking.booking_date}</span>
-                                                </div>
-                                            </div>
 
-                                            {booking.special_requests && (
-                                                <div className="bg-muted p-2 rounded text-sm">
-                                                    <strong>Special Requests:</strong> {booking.special_requests}
-                                                </div>
-                                            )}
+                                                {booking.special_requests && (
+                                                    <div className="bg-muted p-2 rounded text-sm">
+                                                        <strong>Special Requests:</strong> {booking.special_requests}
+                                                    </div>
+                                                )}
 
-                                            {selectedBooking === booking.id && booking.status === 'pending' && (
-                                                <div className="mt-3 flex gap-2">
-                                                    <Button 
-                                                        size="sm" 
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleBookingAction(booking.id, 'confirm');
-                                                        }}
-                                                        disabled={loading}
-                                                        className="bg-green-600 hover:bg-green-700"
-                                                    >
-                                                        <Check className="h-4 w-4 mr-1" />
-                                                        Confirm
-                                                    </Button>
-                                                    <Button 
-                                                        variant="destructive" 
+                                                {selectedBooking === booking.id && booking.status === 'pending' && (
+                                                    <div className="mt-3 flex gap-2">
+                                                        <Button 
+                                                            size="sm" 
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleBookingAction(booking.id, 'confirm');
+                                                            }}
+                                                            disabled={loading}
+                                                            className="bg-green-600 hover:bg-green-700"
+                                                        >
+                                                            <Check className="h-4 w-4 mr-1" />
+                                                            Confirm
+                                                        </Button>
+                                                        <Button 
+                                                            variant="destructive" 
+                                                            size="sm"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleBookingAction(booking.id, 'reject');
+                                                            }}
+                                                            disabled={loading}
+                                                        >
+                                                            <X className="h-4 w-4 mr-1" />
+                                                            Reject
+                                                        </Button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+
+                                        {/* Pagination Controls */}
+                                        {totalPages > 1 && (
+                                            <div className="flex items-center justify-between pt-4 border-t">
+                                                <div className="text-sm text-gray-500">
+                                                    Showing {startIndex + 1} to {Math.min(endIndex, bookings.length)} of {bookings.length} bookings
+                                                </div>
+                                                <div className="flex items-center space-x-1">
+                                                    <Button
+                                                        variant="outline"
                                                         size="sm"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleBookingAction(booking.id, 'reject');
-                                                        }}
-                                                        disabled={loading}
+                                                        onClick={goToFirstPage}
+                                                        disabled={currentPage === 1}
+                                                        className="p-2"
                                                     >
-                                                        <X className="h-4 w-4 mr-1" />
-                                                        Reject
+                                                        <ChevronsLeft className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={goToPreviousPage}
+                                                        disabled={currentPage === 1}
+                                                        className="p-2"
+                                                    >
+                                                        <ChevronLeft className="h-4 w-4" />
+                                                    </Button>
+                                                    
+                                                    {/* Page numbers */}
+                                                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                                        let pageNum;
+                                                        if (totalPages <= 5) {
+                                                            pageNum = i + 1;
+                                                        } else if (currentPage <= 3) {
+                                                            pageNum = i + 1;
+                                                        } else if (currentPage >= totalPages - 2) {
+                                                            pageNum = totalPages - 4 + i;
+                                                        } else {
+                                                            pageNum = currentPage - 2 + i;
+                                                        }
+
+                                                        return (
+                                                            <Button
+                                                                key={pageNum}
+                                                                variant={currentPage === pageNum ? "default" : "outline"}
+                                                                size="sm"
+                                                                onClick={() => goToPage(pageNum)}
+                                                                className="min-w-[32px]"
+                                                            >
+                                                                {pageNum}
+                                                            </Button>
+                                                        );
+                                                    })}
+
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={goToNextPage}
+                                                        disabled={currentPage === totalPages}
+                                                        className="p-2"
+                                                    >
+                                                        <ChevronRight className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={goToLastPage}
+                                                        disabled={currentPage === totalPages}
+                                                        className="p-2"
+                                                    >
+                                                        <ChevronsRight className="h-4 w-4" />
                                                     </Button>
                                                 </div>
-                                            )}
-                                        </div>
-                                    ))
+                                            </div>
+                                        )}
+                                    </>
                                 )}
                             </CardContent>
                         </Card>

@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-
 use App\Models\Booking;
 use App\Models\Room;
 use Illuminate\Http\Request;
@@ -19,73 +18,112 @@ class DashboardController extends Controller
     /**
      * Display the unified dashboard based on user role.
      */
-    public function index(): Response
-    {
-        try {
-            $user = auth()->user();
-            $isAdmin = $this->isAdmin($user);
-            
-            // Get dashboard data based on user role
-            $dashboardData = $isAdmin ? 
-                $this->getAdminDashboardData() : 
-                $this->getUserDashboardData($user->id);
-            
-            return Inertia::render('dashboard/index', [
-                'dashboardData' => $dashboardData,
-                'userRole' => $user->role ?? 'client',
-                'isAdmin' => $isAdmin,
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Dashboard data fetch error', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'user_id' => auth()->id(),
-            ]);
+            public function index(): Response
+            {
+                try {
+                    $user = auth()->user();
+                    $isAdmin = $this->isAdmin($user);
+                    
+                    if ($isAdmin) {
+                        // Admin Dashboard
+                        $dashboardData = $this->getAdminDashboardData();
+                        
+                        return Inertia::render('dashboard/admin/index', [
+                            'dashboardData' => $dashboardData,
+                            'userRole' => $user->role ?? 'admin',
+                            'isAdmin' => true,
+                        ]);
+                    } else {
+                        // User Dashboard - Return data in the exact format React component expects
+                        $dashboardData = $this->getUserDashboardData($user->id);
+                        
+                        return Inertia::render('dashboard/user/index', [
+                            'user' => [
+                                'id' => $user->id,
+                                'name' => $user->name,
+                                'email' => $user->email,
+                                'phone' => $user->phone ?? null,
+                                'member_since' => $user->created_at ? $user->created_at->format('Y-m-d') : null,
+                            ],
+                            'userStats' => $dashboardData['userStats'],
+                            'recentBookings' => $dashboardData['recentBookings'],
+                            'upcomingBookings' => $dashboardData['upcomingBookings'],
+                            'hotelServices' => $dashboardData['hotelServices'],
+                            'notifications' => $dashboardData['notifications'] ?? [],
+                        ]);
+                    }
+                } catch (\Exception $e) {
+                    Log::error('Dashboard data fetch error', [
+                        'error' => $e->getMessage(),
+                        'user_id' => auth()->id(),
+                    ]);
 
-            return Inertia::render('dashboard/index', [
-                'dashboardData' => $this->getEmptyDashboardData(),
-                'userRole' => auth()->user()->role ?? 'client',
-                'isAdmin' => $this->isAdmin(auth()->user()),
-                'error' => 'Failed to load dashboard data',
-            ]);
-        }
-    }
-
-    /**
-     * Get dashboard statistics based on user role.
-     */
-    public function stats(): JsonResponse
-    {
-        try {
-            $user = auth()->user();
-            $isAdmin = $this->isAdmin($user);
-            
-            if ($isAdmin) {
-                $stats = $this->getBookingStats();
-            } else {
-                $stats = $this->getUserBookingStats($user->id);
+                    // Return error state with proper structure
+                    $user = auth()->user();
+                    $isAdmin = $this->isAdmin($user);
+                    
+                    if ($isAdmin) {
+                        return Inertia::render('dashboard/admin/index', [
+                            'dashboardData' => $this->getEmptyDashboardData(),
+                            'userRole' => $user->role ?? 'admin',
+                            'isAdmin' => true,
+                            'error' => 'Failed to load dashboard data',
+                        ]);
+                    } else {
+                        return Inertia::render('dashboard/user/index', [
+                            'user' => [
+                                'id' => $user->id,
+                                'name' => $user->name,
+                                'email' => $user->email,
+                                'phone' => $user->phone ?? null,
+                                'member_since' => $user->created_at ? $user->created_at->format('Y-m-d') : null,
+                            ],
+                            'userStats' => $this->getEmptyUserStats(),
+                            'recentBookings' => [],
+                            'upcomingBookings' => [],
+                            'hotelServices' => $this->getDefaultHotelServices(),
+                            'notifications' => [],
+                            'error' => 'Failed to load dashboard data',
+                        ]);
+                    }
+                }
             }
-            
-            return response()->json([
-                'success' => true,
-                'stats' => $stats,
-                'userRole' => $user->role ?? 'client',
-                'isAdmin' => $isAdmin,
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Failed to fetch dashboard statistics', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'user_id' => auth()->id(),
-            ]);
 
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to fetch dashboard statistics',
-                'error' => config('app.debug') ? $e->getMessage() : null,
-            ], 500);
+        /**
+         * Get dashboard statistics based on user role.
+         */
+        public function stats(): JsonResponse
+        {
+            try {
+                $user = auth()->user();
+                $isAdmin = $this->isAdmin($user);
+                
+                if ($isAdmin) {
+                    $stats = $this->getBookingStats();
+                } else {
+                    $stats = $this->getUserBookingStats($user->id);
+                }
+                
+                return response()->json([
+                    'success' => true,
+                    'stats' => $stats,
+                    'userRole' => $user->role ?? 'client',
+                    'isAdmin' => $isAdmin,
+                ]);
+            } catch (\Exception $e) {
+                Log::error('Failed to fetch dashboard statistics', [
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                    'user_id' => auth()->id(),
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to fetch dashboard statistics',
+                    'error' => config('app.debug') ? $e->getMessage() : null,
+                ], 500);
+            }
         }
-    }
 
     /**
      * Get recent bookings for dashboard.
@@ -267,280 +305,387 @@ class DashboardController extends Controller
         ];
     }
 
-    /**
-     * Get user dashboard data.
-     */
-    private function getUserDashboardData(int $userId): array
-    {
-        $bookingStats = $this->getUserBookingStats($userId);
-        $recentBookings = $this->getUserRecentBookingsData($userId);
+/**
+ * Get user dashboard data - FIXED VERSION
+ */
+private function getUserDashboardData(int $userId): array
+{
+    // Get user stats in the format expected by React component
+    $userStats = $this->getUserStats($userId);
+    $recentBookings = $this->getUserRecentBookingsData($userId);
+    $upcomingBookings = $this->getUserUpcomingBookingsData($userId);
+    $hotelServices = $this->getDefaultHotelServices();
+
+    return [
+        'userStats' => $userStats,
+        'recentBookings' => $recentBookings,
+        'upcomingBookings' => $upcomingBookings,
+        'hotelServices' => $hotelServices,
+        'notifications' => [],
+    ];
+}
+
+/**
+ * Get comprehensive user statistics - NEW METHOD
+ */
+private function getUserStats(int $userId): array
+{
+    try {
+        // Get all bookings for the user
+        $allBookings = DB::table('bookings')
+            ->selectRaw('
+                COUNT(*) as total_bookings,
+                COUNT(CASE WHEN status IN ("confirmed", "checked_in") THEN 1 END) as active_bookings,
+                COUNT(CASE WHEN status = "checked_out" THEN 1 END) as completed_stays,
+                SUM(CASE WHEN status IN ("confirmed", "checked_in", "checked_out") THEN total_amount ELSE 0 END) as total_spent
+            ')
+            ->where('user_id', $userId)
+            ->first();
+
+        // Get upcoming bookings count
+        $upcomingBookings = DB::table('bookings')
+            ->where('user_id', $userId)
+            ->whereIn('status', ['confirmed', 'checked_in'])
+            ->where('check_in', '>=', Carbon::today())
+            ->count();
+
+        // Calculate loyalty points and membership tier
+        $totalSpent = (float) ($allBookings->total_spent ?? 0);
+        $loyaltyPoints = (int) ($totalSpent * 10); // 10 points per dollar
+        $membershipTier = $this->getMembershipTier($totalSpent);
 
         return [
-            'bookingStats' => $bookingStats,
-            'recentBookings' => $recentBookings,
-            'lastUpdated' => now()->toISOString(),
+            'totalBookings' => (int) ($allBookings->total_bookings ?? 0),
+            'activeBookings' => (int) ($allBookings->active_bookings ?? 0),
+            'completedStays' => (int) ($allBookings->completed_stays ?? 0),
+            'totalSpent' => $totalSpent,
+            'loyaltyPoints' => $loyaltyPoints,
+            'membershipTier' => $membershipTier,
+            'upcomingBookings' => $upcomingBookings,
         ];
+    } catch (\Exception $e) {
+        Log::error('Error getting user stats', ['error' => $e->getMessage(), 'user_id' => $userId]);
+        return $this->getEmptyUserStats();
     }
+}
 
-    /**
-     * Get booking statistics for admins.
-     */
-    private function getBookingStats(): array
-    {
-        $today = Carbon::today();
-        $thisMonth = Carbon::now()->startOfMonth();
-        $lastMonth = Carbon::now()->subMonth()->startOfMonth();
-        $lastMonthEnd = Carbon::now()->subMonth()->endOfMonth();
-
-        try {
-            // Get current month stats
-            $currentStats = DB::table('bookings')
-                ->selectRaw('
-                    COUNT(*) as total_bookings,
-                    SUM(CASE WHEN status = "pending" THEN 1 ELSE 0 END) as pending_bookings,
-                    SUM(CASE WHEN status = "confirmed" THEN 1 ELSE 0 END) as confirmed_bookings,
-                    SUM(CASE WHEN status = "rejected" THEN 1 ELSE 0 END) as rejected_bookings,
-                    SUM(CASE WHEN status = "confirmed" THEN total_amount ELSE 0 END) as total_revenue,
-                    AVG(CASE WHEN status = "confirmed" THEN total_amount ELSE NULL END) as avg_booking_value
-                ')
-                ->whereDate('created_at', '>=', $thisMonth)
-                ->first();
-
-            // Get today's stats
-            $todayStats = DB::table('bookings')
-                ->selectRaw('
-                    COUNT(CASE WHEN DATE(created_at) = ? THEN 1 END) as today_requests,
-                    COUNT(CASE WHEN DATE(updated_at) = ? AND status IN ("confirmed", "rejected") THEN 1 END) as today_processed
-                ')
-                ->setBindings([$today->format('Y-m-d'), $today->format('Y-m-d')])
-                ->first();
-
-            // Get last month stats for comparison
-            $lastMonthStats = DB::table('bookings')
-                ->selectRaw('SUM(CASE WHEN status = "confirmed" THEN total_amount ELSE 0 END) as last_month_revenue')
-                ->whereBetween('created_at', [$lastMonth, $lastMonthEnd])
-                ->first();
-
-            // Calculate growth
-            $revenueGrowth = 0;
-            if (($lastMonthStats->last_month_revenue ?? 0) > 0 && ($currentStats->total_revenue ?? 0) > 0) {
-                $revenueGrowth = (($currentStats->total_revenue - $lastMonthStats->last_month_revenue) / $lastMonthStats->last_month_revenue) * 100;
-            }
-
-            return [
-                'totalBookings' => (int) ($currentStats->total_bookings ?? 0),
-                'pendingBookings' => (int) ($currentStats->pending_bookings ?? 0),
-                'confirmedBookings' => (int) ($currentStats->confirmed_bookings ?? 0),
-                'rejectedBookings' => (int) ($currentStats->rejected_bookings ?? 0),
-                'totalRevenue' => (float) ($currentStats->total_revenue ?? 0),
-                'avgBookingValue' => (float) ($currentStats->avg_booking_value ?? 0),
-                'todayRequests' => (int) ($todayStats->today_requests ?? 0),
-                'todayProcessed' => (int) ($todayStats->today_processed ?? 0),
-                'revenueGrowth' => round($revenueGrowth, 1),
-            ];
-        } catch (\Exception $e) {
-            Log::error('Error getting booking stats', ['error' => $e->getMessage()]);
-            return $this->getEmptyBookingStats();
-        }
+/**
+ * Get upcoming bookings for user - NEW METHOD
+ */
+private function getUserUpcomingBookingsData(int $userId): array
+{
+    try {
+        return Booking::with(['room'])
+            ->where('user_id', $userId)
+            ->whereIn('status', ['confirmed', 'checked_in'])
+            ->where('check_in', '>=', Carbon::today())
+            ->orderBy('check_in', 'asc')
+            ->limit(10)
+            ->get()
+            ->map(function ($booking) {
+                return [
+                    'id' => $booking->id,
+                    'room_type' => $booking->room->name ?? $booking->room_type ?? 'Standard Room',
+                    'room_number' => $booking->room->number ?? null,
+                    'check_in' => $booking->check_in ? $booking->check_in->format('Y-m-d') : null,
+                    'check_out' => $booking->check_out ? $booking->check_out->format('Y-m-d') : null,
+                    'adults' => (int) ($booking->adults ?? 1),
+                    'children' => (int) ($booking->children ?? 0),
+                    'nights' => $booking->check_in && $booking->check_out ? 
+                        $booking->check_in->diffInDays($booking->check_out) : 1,
+                    'total_amount' => (float) ($booking->total_amount ?? 0),
+                    'status' => $booking->status ?? 'pending',
+                    'booking_date' => $booking->created_at ? $booking->created_at->format('Y-m-d') : null,
+                    'special_requests' => $booking->special_requests ?? null,
+                    'booking_reference' => $booking->booking_reference ?? 'BK-' . str_pad($booking->id, 6, '0', STR_PAD_LEFT),
+                ];
+            })
+            ->toArray();
+    } catch (\Exception $e) {
+        Log::error('Error getting upcoming bookings', ['error' => $e->getMessage(), 'user_id' => $userId]);
+        return [];
     }
+}
 
-    /**
-     * Get booking statistics for a specific user.
-     */
-    private function getUserBookingStats(int $userId): array
-    {
-        $today = Carbon::today();
-        $thisMonth = Carbon::now()->startOfMonth();
-        
-        try {
-            $stats = DB::table('bookings')
-                ->selectRaw('
-                    COUNT(*) as total_bookings,
-                    SUM(CASE WHEN status = "pending" THEN 1 ELSE 0 END) as pending_bookings,
-                    SUM(CASE WHEN status = "confirmed" THEN 1 ELSE 0 END) as confirmed_bookings,
-                    SUM(CASE WHEN status = "rejected" THEN 1 ELSE 0 END) as rejected_bookings,
-                    SUM(CASE WHEN status = "confirmed" THEN total_amount ELSE 0 END) as total_spent,
-                    AVG(CASE WHEN status = "confirmed" THEN total_amount ELSE NULL END) as avg_booking_value
-                ')
-                ->where('user_id', $userId)
-                ->whereDate('created_at', '>=', $thisMonth)
-                ->first();
-
-            $todayStats = DB::table('bookings')
-                ->selectRaw('
-                    COUNT(CASE WHEN DATE(created_at) = ? THEN 1 END) as today_requests,
-                    COUNT(CASE WHEN DATE(updated_at) = ? AND status IN ("confirmed", "rejected") THEN 1 END) as today_processed
-                ')
-                ->where('user_id', $userId)
-                ->setBindings([$today->format('Y-m-d'), $today->format('Y-m-d')])
-                ->first();
-
-            return [
-                'totalBookings' => (int) ($stats->total_bookings ?? 0),
-                'pendingBookings' => (int) ($stats->pending_bookings ?? 0),
-                'confirmedBookings' => (int) ($stats->confirmed_bookings ?? 0),
-                'rejectedBookings' => (int) ($stats->rejected_bookings ?? 0),
-                'totalRevenue' => (float) ($stats->total_spent ?? 0),
-                'avgBookingValue' => (float) ($stats->avg_booking_value ?? 0),
-                'todayRequests' => (int) ($todayStats->today_requests ?? 0),
-                'todayProcessed' => (int) ($todayStats->today_processed ?? 0),
-                'revenueGrowth' => 0,
-            ];
-        } catch (\Exception $e) {
-            Log::error('Error getting user booking stats', ['error' => $e->getMessage(), 'user_id' => $userId]);
-            return $this->getEmptyBookingStats();
-        }
+/**
+ * Get membership tier based on total spent - NEW METHOD
+ */
+private function getMembershipTier(float $totalSpent): string
+{
+    if ($totalSpent >= 10000) {
+        return 'Platinum';
+    } elseif ($totalSpent >= 5000) {
+        return 'Gold';
+    } elseif ($totalSpent >= 2500) {
+        return 'Silver';
+    } else {
+        return 'Bronze';
     }
+}
 
-    /**
-     * Get room statistics (admin only).
-     */
-    private function getRoomStats(): array
-    {
-        try {
-            $today = Carbon::today();
-            
-            // Get total rooms
-            $totalRooms = Room::count();
-            
-            // Get occupied rooms (confirmed bookings for today)
-            $occupiedRooms = Booking::where('status', 'confirmed')
-                ->whereDate('check_in', '<=', $today)
-                ->whereDate('check_out', '>', $today)
-                ->count();
+/**
+ * Get default hotel services - NEW METHOD
+ */
+private function getDefaultHotelServices(): array
+{
+    return [
+        [
+            'id' => 1,
+            'name' => 'Restaurant',
+            'description' => 'Fine dining experience',
+            'icon' => 'restaurant',
+            'status' => 'available',
+            'hours' => '6:00 AM - 11:00 PM'
+        ],
+        [
+            'id' => 2,
+            'name' => 'WiFi',
+            'description' => 'High-speed internet',
+            'icon' => 'wifi',
+            'status' => 'available',
+            'hours' => '24/7'
+        ],
+        [
+            'id' => 3,
+            'name' => 'Parking',
+            'description' => 'Secure parking facility',
+            'icon' => 'parking',
+            'status' => 'available',
+            'hours' => '24/7'
+        ],
+        [
+            'id' => 4,
+            'name' => 'Gym',
+            'description' => 'Fitness center',
+            'icon' => 'gym',
+            'status' => 'available',
+            'hours' => '5:00 AM - 11:00 PM'
+        ],
+        [
+            'id' => 5,
+            'name' => 'Spa',
+            'description' => 'Wellness and relaxation',
+            'icon' => 'spa',
+            'status' => 'available',
+            'hours' => '9:00 AM - 9:00 PM'
+        ],
+        [
+            'id' => 6,
+            'name' => 'Coffee Shop',
+            'description' => 'Fresh coffee and snacks',
+            'icon' => 'coffee',
+            'status' => 'available',
+            'hours' => '6:00 AM - 10:00 PM'
+        ]
+    ];
+}
 
-            // Get rooms under maintenance
-            $maintenanceRooms = Room::where('is_available', false)->count();
-            
-            // Calculate available rooms
-            $availableRooms = max(0, $totalRooms - $occupiedRooms - $maintenanceRooms);
-            
-            // Calculate occupancy rate
-            $occupancyRate = $totalRooms > 0 ? ($occupiedRooms / $totalRooms) * 100 : 0;
-
-            // Get check-ins and check-outs for today
-            $checkInsToday = Booking::where('status', 'confirmed')
-                ->whereDate('check_in', $today)
-                ->count();
-                
-            $checkOutsToday = Booking::where('status', 'confirmed')
-                ->whereDate('check_out', $today)
-                ->count();
-
-            return [
-                'totalRooms' => $totalRooms,
-                'occupiedRooms' => $occupiedRooms,
-                'availableRooms' => $availableRooms,
-                'maintenanceRooms' => $maintenanceRooms,
-                'occupancyRate' => round($occupancyRate, 1),
-                'checkInsToday' => $checkInsToday,
-                'checkOutsToday' => $checkOutsToday,
-            ];
-        } catch (\Exception $e) {
-            Log::error('Error getting room stats', ['error' => $e->getMessage()]);
-            return [
-                'totalRooms' => 0,
-                'occupiedRooms' => 0,
-                'availableRooms' => 0,
-                'maintenanceRooms' => 0,
-                'occupancyRate' => 0,
-                'checkInsToday' => 0,
-                'checkOutsToday' => 0,
-            ];
-        }
+/**
+ * Get empty user stats - NEW METHOD
+ */
+private function getEmptyUserStats(): array
+{
+    return [
+        'totalBookings' => 0,
+        'activeBookings' => 0,
+        'completedStays' => 0,
+        'totalSpent' => 0,
+        'loyaltyPoints' => 0,
+        'membershipTier' => 'Bronze',
+        'upcomingBookings' => 0,
+    ];
+}
+/**
+ * Get recent bookings for a specific user - NEW METHOD
+ */
+private function getUserRecentBookingsData(int $userId): array
+{
+    try {
+        return Booking::with(['room'])
+            ->where('user_id', $userId)
+            ->orderBy('created_at', 'desc')
+            ->limit(5)
+            ->get()
+            ->map(function ($booking) {
+                return [
+                    'id' => $booking->id,
+                    'guest_name' => $booking->user->name ?? 'N/A',
+                    'guest_email' => $booking->user->email ?? 'N/A',
+                    'room_type' => $booking->room->name ?? $booking->room_type ?? 'Standard Room',
+                    'room_number' => $booking->room->number ?? null,
+                    'check_in' => $booking->check_in ? $booking->check_in->format('Y-m-d') : null,
+                    'check_out' => $booking->check_out ? $booking->check_out->format('Y-m-d') : null,
+                    'total_amount' => (float) ($booking->total_amount ?? 0),
+                    'status' => $booking->status ?? 'pending',
+                    'created_at' => $booking->created_at ? $booking->created_at->format('Y-m-d H:i:s') : null,
+                    'booking_reference' => $booking->booking_reference ?? 'BK-' . str_pad($booking->id, 6, '0', STR_PAD_LEFT),
+                ];
+            })
+            ->toArray();
+    } catch (\Exception $e) {
+        Log::error('Error getting user recent bookings', ['error' => $e->getMessage(), 'user_id' => $userId]);
+        return [];
     }
+}
 
-    /**
-     * Get recent bookings data (admin).
-     */
-    private function getRecentBookingsData(): array
-    {
-        try {
-            return Booking::with(['user', 'room'])
-                ->orderBy('created_at', 'desc')
-                ->limit(4)
-                ->get()
-                ->map(function ($booking) {
-                    return [
-                        'id' => $booking->id,
-                        'guest_name' => $booking->user->name ?? $booking->guest_name ?? 'N/A',
-                        'room_type' => $booking->room->name ?? $booking->room_type ?? 'N/A',
-                        'check_in' => $booking->check_in ? $booking->check_in->format('Y-m-d') : 'N/A',
-                        'status' => $booking->status ?? 'pending',
-                        'total_amount' => (float) ($booking->total_amount ?? 0),
-                    ];
-                })
-                ->toArray();
-        } catch (\Exception $e) {
-            Log::error('Error getting recent bookings data', ['error' => $e->getMessage()]);
-            return [];
-        }
-    }
+/**
+ * Get admin booking statistics - MISSING METHOD
+ */
+private function getBookingStats(): array
+{
+    try {
+        $stats = DB::table('bookings')
+            ->selectRaw('
+                COUNT(*) as total_bookings,
+                COUNT(CASE WHEN status = "confirmed" THEN 1 END) as confirmed_bookings,
+                COUNT(CASE WHEN status = "pending" THEN 1 END) as pending_bookings,
+                COUNT(CASE WHEN status = "cancelled" THEN 1 END) as cancelled_bookings,
+                SUM(CASE WHEN status = "confirmed" THEN total_amount ELSE 0 END) as total_revenue,
+                AVG(CASE WHEN status = "confirmed" THEN total_amount END) as avg_booking_value
+            ')
+            ->first();
 
-    /**
-     * Get recent bookings data for a specific user.
-     */
-    private function getUserRecentBookingsData(int $userId): array
-    {
-        try {
-            return Booking::with(['room'])
-                ->where('user_id', $userId)
-                ->orderBy('created_at', 'desc')
-                ->limit(4)
-                ->get()
-                ->map(function ($booking) {
-                    return [
-                        'id' => $booking->id,
-                        'guest_name' => $booking->guest_name ?? 'N/A',
-                        'room_type' => $booking->room->name ?? $booking->room_type ?? 'N/A',
-                        'check_in' => $booking->check_in ? $booking->check_in->format('Y-m-d') : 'N/A',
-                        'status' => $booking->status ?? 'pending',
-                        'total_amount' => (float) ($booking->total_amount ?? 0),
-                    ];
-                })
-                ->toArray();
-        } catch (\Exception $e) {
-            Log::error('Error getting user recent bookings data', ['error' => $e->getMessage(), 'user_id' => $userId]);
-            return [];
-        }
-    }
-
-    /**
-     * Get empty booking stats.
-     */
-    private function getEmptyBookingStats(): array
-    {
+        return [
+            'totalBookings' => (int) ($stats->total_bookings ?? 0),
+            'confirmedBookings' => (int) ($stats->confirmed_bookings ?? 0),
+            'pendingBookings' => (int) ($stats->pending_bookings ?? 0),
+            'cancelledBookings' => (int) ($stats->cancelled_bookings ?? 0),
+            'totalRevenue' => (float) ($stats->total_revenue ?? 0),
+            'avgBookingValue' => (float) ($stats->avg_booking_value ?? 0),
+        ];
+    } catch (\Exception $e) {
+        Log::error('Error getting booking stats', ['error' => $e->getMessage()]);
         return [
             'totalBookings' => 0,
-            'pendingBookings' => 0,
             'confirmedBookings' => 0,
-            'rejectedBookings' => 0,
+            'pendingBookings' => 0,
+            'cancelledBookings' => 0,
             'totalRevenue' => 0,
             'avgBookingValue' => 0,
-            'todayRequests' => 0,
-            'todayProcessed' => 0,
-            'revenueGrowth' => 0,
         ];
     }
+}
 
-    /**
-     * Get empty dashboard data structure.
-     */
-    private function getEmptyDashboardData(): array
-    {
+/**
+ * Get user booking statistics - MISSING METHOD
+ */
+private function getUserBookingStats(int $userId): array
+{
+    try {
+        $stats = DB::table('bookings')
+            ->selectRaw('
+                COUNT(*) as total_bookings,
+                COUNT(CASE WHEN status = "confirmed" THEN 1 END) as confirmed_bookings,
+                COUNT(CASE WHEN status = "pending" THEN 1 END) as pending_bookings,
+                COUNT(CASE WHEN status = "cancelled" THEN 1 END) as cancelled_bookings,
+                SUM(CASE WHEN status = "confirmed" THEN total_amount ELSE 0 END) as total_spent
+            ')
+            ->where('user_id', $userId)
+            ->first();
+
         return [
-            'bookingStats' => $this->getEmptyBookingStats(),
-            'roomStats' => [
-                'totalRooms' => 0,
-                'occupiedRooms' => 0,
-                'availableRooms' => 0,
-                'maintenanceRooms' => 0,
-                'occupancyRate' => 0,
-                'checkInsToday' => 0,
-                'checkOutsToday' => 0,
-            ],
-            'recentBookings' => [],
-            'lastUpdated' => now()->toISOString(),
+            'totalBookings' => (int) ($stats->total_bookings ?? 0),
+            'confirmedBookings' => (int) ($stats->confirmed_bookings ?? 0),
+            'pendingBookings' => (int) ($stats->pending_bookings ?? 0),
+            'cancelledBookings' => (int) ($stats->cancelled_bookings ?? 0),
+            'totalSpent' => (float) ($stats->total_spent ?? 0),
+        ];
+    } catch (\Exception $e) {
+        Log::error('Error getting user booking stats', ['error' => $e->getMessage(), 'user_id' => $userId]);
+        return [
+            'totalBookings' => 0,
+            'confirmedBookings' => 0,
+            'pendingBookings' => 0,
+            'cancelledBookings' => 0,
+            'totalSpent' => 0,
         ];
     }
+}
+
+/**
+ * Get room statistics - MISSING METHOD
+ */
+private function getRoomStats(): array
+{
+    try {
+        $stats = DB::table('rooms')
+            ->selectRaw('
+                COUNT(*) as total_rooms,
+                COUNT(CASE WHEN status = "available" THEN 1 END) as available_rooms,
+                COUNT(CASE WHEN status = "occupied" THEN 1 END) as occupied_rooms,
+                COUNT(CASE WHEN status = "maintenance" THEN 1 END) as maintenance_rooms
+            ')
+            ->first();
+
+        return [
+            'totalRooms' => (int) ($stats->total_rooms ?? 0),
+            'availableRooms' => (int) ($stats->available_rooms ?? 0),
+            'occupiedRooms' => (int) ($stats->occupied_rooms ?? 0),
+            'maintenanceRooms' => (int) ($stats->maintenance_rooms ?? 0),
+        ];
+    } catch (\Exception $e) {
+        Log::error('Error getting room stats', ['error' => $e->getMessage()]);
+        return [
+            'totalRooms' => 0,
+            'availableRooms' => 0,
+            'occupiedRooms' => 0,
+            'maintenanceRooms' => 0,
+        ];
+    }
+}
+
+/**
+ * Get recent bookings for admin - MISSING METHOD
+ */
+private function getRecentBookingsData(): array
+{
+    try {
+        return Booking::with(['user', 'room'])
+            ->orderBy('created_at', 'desc')
+            ->limit(10)
+            ->get()
+            ->map(function ($booking) {
+                return [
+                    'id' => $booking->id,
+                    'guest_name' => $booking->user->name ?? $booking->guest_name ?? 'N/A',
+                    'guest_email' => $booking->user->email ?? $booking->guest_email ?? 'N/A',
+                    'room_type' => $booking->room->name ?? $booking->room_type ?? 'N/A',
+                    'check_in' => $booking->check_in ? $booking->check_in->format('Y-m-d') : 'N/A',
+                    'check_out' => $booking->check_out ? $booking->check_out->format('Y-m-d') : 'N/A',
+                    'total_amount' => (float) ($booking->total_amount ?? 0),
+                    'status' => $booking->status ?? 'pending',
+                    'created_at' => $booking->created_at ? $booking->created_at->format('Y-m-d H:i:s') : 'N/A',
+                ];
+            })
+            ->toArray();
+    } catch (\Exception $e) {
+        Log::error('Error getting recent bookings', ['error' => $e->getMessage()]);
+        return [];
+    }
+}
+
+/**
+ * Get empty dashboard data for error states - MISSING METHOD
+ */
+private function getEmptyDashboardData(): array
+{
+    return [
+        'bookingStats' => [
+            'totalBookings' => 0,
+            'confirmedBookings' => 0,
+            'pendingBookings' => 0,
+            'cancelledBookings' => 0,
+            'totalRevenue' => 0,
+            'avgBookingValue' => 0,
+        ],
+        'roomStats' => [
+            'totalRooms' => 0,
+            'availableRooms' => 0,
+            'occupiedRooms' => 0,
+            'maintenanceRooms' => 0,
+        ],
+        'recentBookings' => [],
+        'lastUpdated' => now()->toISOString(),
+    ];
+}
 }
