@@ -52,7 +52,7 @@ const footerNavItems: NavItem[] = [
 ];
 
 // Function to get navigation items based on user role
-const getMainNavItems = (isAdmin: boolean): NavItem[] => {
+const getMainNavItems = (isAdmin: boolean, isStaff: boolean): NavItem[] => {
     const baseItems: NavItem[] = [
         {
             title: 'Dashboard',
@@ -60,7 +60,19 @@ const getMainNavItems = (isAdmin: boolean): NavItem[] => {
             icon: LayoutGrid,
         },
     ];
-
+    if (isStaff) {
+        baseItems.push(
+      
+        );
+    } else {
+        baseItems.push(
+            {
+                title: 'Profile',
+                href: route('profile'),
+                icon: UserIcon,
+            }
+        );
+    }
     if (isAdmin) {
         const adminItems: NavItem[] = [
             {
@@ -76,8 +88,8 @@ const getMainNavItems = (isAdmin: boolean): NavItem[] => {
         ];
         
         return [...baseItems, ...adminItems];
-    } else {
-        // Only show "My Bookings" for regular users/clients, not admins
+    } else if (!isStaff) {
+        // Only show "My Bookings" for regular users/clients, not staff or admins
         const userItems: NavItem[] = [
             {
                 title: 'Bookings',
@@ -87,6 +99,9 @@ const getMainNavItems = (isAdmin: boolean): NavItem[] => {
         ];
         
         return [...baseItems, ...userItems];
+    } else {
+        // Staff (but not admin) - no extra items
+        return baseItems;
     }
 };
 
@@ -94,9 +109,10 @@ export function AppSidebar() {
     const { props } = usePage<PageProps>();
     const user = props.auth.user;
     const isAdmin = user?.is_admin || user?.role === 'admin';
+    const isStaff = user?.role === 'staff' || isAdmin;
     
     // Get navigation items based on user role
-    const mainNavItems = getMainNavItems(isAdmin);
+    const mainNavItems = getMainNavItems(isAdmin, isStaff);
 
     return (
         <Sidebar collapsible="icon" variant="inset">
