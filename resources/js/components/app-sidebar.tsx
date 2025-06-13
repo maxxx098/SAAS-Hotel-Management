@@ -66,7 +66,7 @@ const getMainNavItems = (isAdmin: boolean, isStaff: boolean): NavItem[] => {
         );
     } else {
         baseItems.push(
-           
+
         );
     }
     if (isAdmin) {
@@ -133,7 +133,7 @@ export function AppSidebar() {
                         <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200">
                             <Shield className="h-3 w-3" />
                             <span className="text-xs font-medium">
-                                {isAdmin ? 'Admin Access' : 'User Access'}
+                                {isAdmin ? 'Admin Access' : isStaff ? 'Staff Access' : 'User Access'}
                             </span>
                         </div>
                     </div>
