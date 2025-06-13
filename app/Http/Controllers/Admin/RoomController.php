@@ -85,20 +85,12 @@ class RoomController extends Controller
         'amenities' => 'nullable|array',
         'amenities.*' => 'string',
         'images' => 'nullable|array',
-        'images.*' => 'image|mimes:jpg,jpeg,png,webp|max:2048',
+        'images.*' => 'string|url',
         'is_available' => 'boolean',
         'is_active' => 'boolean',
     ]);
 
-    $imagePaths = [];
-
-    if ($request->hasFile('images')) {
-        foreach ($request->file('images') as $image) {
-            $imagePaths[] = $image->store('rooms', 'public'); // stored in storage/app/public/rooms
-        }
-    }
-
-    $validated['images'] = $imagePaths;
+   $validated['images'] = $validated['images'] ?? [];
 
     Room::create($validated);
 
