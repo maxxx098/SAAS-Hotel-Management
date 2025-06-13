@@ -3,7 +3,12 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, usePage } from '@inertiajs/react';
 import { router } from '@inertiajs/react';
+import { Button } from '@/components/ui/button';
 import { 
+    ChevronLeft, 
+    ChevronRight, 
+    ChevronsLeft, 
+    ChevronsRight ,
     Users, 
     Bed, 
     DollarSign, 
@@ -30,6 +35,12 @@ const breadcrumbs: BreadcrumbItem[] = [
         href: '/dashboard',
     },
 ];
+
+interface PaginationState {
+    currentPage: number;
+    itemsPerPage: number;
+    totalItems: number;
+}
 
 interface DashboardStats {
     totalBookings: number;
@@ -85,7 +96,42 @@ interface PageProps {
 export default function Dashboard() {
     const { props } = usePage<PageProps>();
     const { userRole, isAdmin, error: serverError } = props;
-    
+    const [paginationState, setPaginationState] = useState<PaginationState>({
+    currentPage: 1,
+    itemsPerPage: 3,
+    totalItems: 0,
+   });
+
+const getTotalPages = () => {
+    return Math.ceil(paginationState.totalItems / paginationState.itemsPerPage);
+};
+
+const handlePageChange = (page: number) => {
+    setPaginationState(prev => ({
+        ...prev,
+        currentPage: page
+    }));
+};
+
+const handlePreviousPage = () => {
+    if (paginationState.currentPage > 1) {
+        handlePageChange(paginationState.currentPage - 1);
+    }
+};
+
+const handleNextPage = () => {
+    if (paginationState.currentPage < getTotalPages()) {
+        handlePageChange(paginationState.currentPage + 1);
+    }
+};
+
+const handleFirstPage = () => {
+    handlePageChange(1);
+};
+
+const handleLastPage = () => {
+    handlePageChange(getTotalPages());
+};
     const [dashboardData, setDashboardData] = useState<DashboardData>({
         bookingStats: {
             totalBookings: 0,
@@ -127,87 +173,103 @@ export default function Dashboard() {
         fetchDashboardData();
     }, []);
 
+// Update your fetchDashboardData function to set totalItems:
+
 const fetchDashboardData = async () => {
-        try {
-            setLoading(true);
-            setError(null);
+    try {
+        setLoading(true);
+        setError(null);
 
-            // Determine the correct endpoint based on user role
-            const baseUrl = isAdmin ? '/admin/dashboard' : '/dashboard';
+        // Determine the correct endpoint based on user role
+        const baseUrl = isAdmin ? '/admin/dashboard' : '/dashboard';
 
-            // Fetch dashboard statistics
-            const statsResponse = await fetch(`${baseUrl}/stats`, {
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                },
-            });
+        // Fetch dashboard statistics
+        const statsResponse = await fetch(`${baseUrl}/stats`, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+            },
+        });
 
-            if (!statsResponse.ok) {
-                throw new Error(`HTTP error! status: ${statsResponse.status}`);
-            }
-
-            const statsData = await statsResponse.json();
-
-            if (!statsData.success) {
-                throw new Error(statsData.message || 'Failed to fetch dashboard statistics');
-            }
-
-            // Fetch recent bookings
-            const bookingsResponse = await fetch(`${baseUrl}/recent-bookings`, {
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                },
-            });
-
-            let recentBookings: RecentBooking[] = [];
-            if (bookingsResponse.ok) {
-                const bookingsData = await bookingsResponse.json();
-                if (bookingsData.success) {
-                    recentBookings = bookingsData.recentBookings || [];
-                }
-            }
-
-            // Use the booking stats from the API
-            const bookingStats = statsData.stats;
-            
-            // Calculate room stats (admin-specific)
-            let adminSpecificData = {};
-            if (isAdmin) {
-                const totalRooms = 150; // You can make this dynamic by adding it to your controller
-                const occupiedRooms = bookingStats.confirmedBookings || 0;
-                const availableRooms = Math.max(0, totalRooms - occupiedRooms);
-                const occupancyRate = totalRooms > 0 ? Math.round((occupiedRooms / totalRooms) * 100 * 10) / 10 : 0;
-
-                adminSpecificData = {
-                    totalRooms,
-                    occupiedRooms,
-                    availableRooms,
-                    occupancyRate,
-                    revenueGrowth: bookingStats.revenueGrowth || 12.5,
-                    avgRating: 4.6, // Static value - you can add this to your controller
-                    staffOnDuty: 24, // Static value - you can add this to your controller
-                    checkInsToday: bookingStats.todayProcessed || 0,
-                    checkOutsToday: Math.floor(bookingStats.todayProcessed * 0.8) || 0,
-                };
-            }
-
-            setDashboardData({
-                bookingStats,
-                recentBookings,
-                ...adminSpecificData,
-            });
-
-        } catch (err) {
-            console.error('Dashboard data fetch error:', err);
-            setError(err instanceof Error ? err.message : 'Failed to fetch dashboard data');
-        } finally {
-            setLoading(false);
+        if (!statsResponse.ok) {
+            throw new Error(`HTTP error! status: ${statsResponse.status}`);
         }
-    };
+
+        const statsData = await statsResponse.json();
+
+        if (!statsData.success) {
+            throw new Error(statsData.message || 'Failed to fetch dashboard statistics');
+        }
+
+        // Fetch recent bookings
+        const bookingsResponse = await fetch(`${baseUrl}/recent-bookings`, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+            },
+        });
+
+        let recentBookings: RecentBooking[] = [];
+        if (bookingsResponse.ok) {
+            const bookingsData = await bookingsResponse.json();
+            if (bookingsData.success) {
+                recentBookings = bookingsData.recentBookings || [];
+            }
+        }
+
+        // Use the booking stats from the API
+        const bookingStats = statsData.stats;
+        
+        // Calculate room stats (admin-specific)
+        let adminSpecificData = {};
+        if (isAdmin) {
+            const totalRooms = 150; // You can make this dynamic by adding it to your controller
+            const occupiedRooms = bookingStats.confirmedBookings || 0;
+            const availableRooms = Math.max(0, totalRooms - occupiedRooms);
+            const occupancyRate = totalRooms > 0 ? Math.round((occupiedRooms / totalRooms) * 100 * 10) / 10 : 0;
+
+            adminSpecificData = {
+                totalRooms,
+                occupiedRooms,
+                availableRooms,
+                occupancyRate,
+                revenueGrowth: bookingStats.revenueGrowth || 12.5,
+                avgRating: 4.6, // Static value - you can add this to your controller
+                staffOnDuty: 24, // Static value - you can add this to your controller
+                checkInsToday: bookingStats.todayProcessed || 0,
+                checkOutsToday: Math.floor(bookingStats.todayProcessed * 0.8) || 0,
+            };
+        }
+
+        setDashboardData({
+            bookingStats,
+            recentBookings,
+            ...adminSpecificData,
+        });
+
+        // *** ADD THIS: Update pagination state with total items ***
+        setPaginationState(prev => ({
+            ...prev,
+            totalItems: recentBookings.length,
+            currentPage: 1 // Reset to first page when data changes
+        }));
+
+    } catch (err) {
+        console.error('Dashboard data fetch error:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch dashboard data');
+    } finally {
+        setLoading(false);
+    }
+};
+
+// Also, make sure your getPaginatedBookings function uses the correct data:
+const getPaginatedBookings = () => {
+    const startIndex = (paginationState.currentPage - 1) * paginationState.itemsPerPage;
+    const endIndex = startIndex + paginationState.itemsPerPage;
+    return dashboardData.recentBookings.slice(startIndex, endIndex); // Use dashboardData.recentBookings instead of just recentBookings
+};
 const handleQuickAction = (action: string) => {
         const baseRoute = isAdmin ? '/admin' : '';
         
@@ -375,49 +437,107 @@ const handleQuickAction = (action: string) => {
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                     
                     {/* Recent Bookings */}
-                    <Card className="lg:col-span-2">
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <Calendar className="h-5 w-5" />
-                                Recent Bookings
-                            </CardTitle>
-                            <CardDescription>Latest reservations and their status</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="space-y-4">
-                                {recentBookings.length > 0 ? (
-                                    recentBookings.map((booking) => (
-                                        <div key={booking.id} className="flex items-center justify-between p-3 rounded-lg border">
-                                            <div className="flex items-center gap-3">
-                                                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                                                    <Users className="h-4 w-4" />
-                                                </div>
-                                                <div>
-                                                    <p className="font-medium">{booking.guest_name}</p>
-                                                    <p className="text-sm text-muted-foreground">
-                                                        {booking.room_type} • {new Date(booking.check_in).toLocaleDateString()}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <div className="text-right">
-                                                <Badge variant={booking.status === 'confirmed' ? 'default' : booking.status === 'pending' ? 'secondary' : 'destructive'}>
-                                                    {booking.status}
-                                                </Badge>
-                                                <p className="text-sm text-muted-foreground mt-1">
-                                                    ₱{booking.total_amount.toLocaleString()}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <div className="text-center py-8 text-muted-foreground">
-                                        <Calendar className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                                        <p>No recent bookings</p>
-                                    </div>
-                                )}
+  <Card className="lg:col-span-2">
+    <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Recent Bookings
+        </CardTitle>
+        <CardDescription>
+            Latest reservations and their status 
+            {recentBookings.length > 0 && (
+                <span className="ml-2 text-xs">
+                    ({paginationState.totalItems} total)
+                </span>
+            )}
+        </CardDescription>
+    </CardHeader>
+    <CardContent>
+        <div className="space-y-4">
+            {getPaginatedBookings().length > 0 ? (
+                <>
+                    {getPaginatedBookings().map((booking) => (
+                        <div key={booking.id} className="flex items-center justify-between p-3 rounded-lg border">
+                            <div className="flex items-center gap-3">
+                                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                                    <Users className="h-4 w-4" />
+                                </div>
+                                <div>
+                                    <p className="font-medium">{booking.guest_name}</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        {booking.room_type} • {new Date(booking.check_in).toLocaleDateString()}
+                                    </p>
+                                </div>
                             </div>
-                        </CardContent>
-                    </Card>
+                            <div className="text-right">
+                                <Badge variant={booking.status === 'confirmed' ? 'default' : booking.status === 'pending' ? 'secondary' : 'destructive'}>
+                                    {booking.status}
+                                </Badge>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                    ₱{booking.total_amount.toLocaleString()}
+                                </p>
+                            </div>
+                        </div>
+                    ))}
+                    
+                    {/* Pagination Controls */}
+                    {getTotalPages() > 1 && (
+                        <div className="flex items-center justify-between pt-4 border-t">
+                            <div className="flex items-center space-x-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleFirstPage}
+                                    disabled={paginationState.currentPage === 1}
+                                >
+                                    <ChevronsLeft className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handlePreviousPage}
+                                    disabled={paginationState.currentPage === 1}
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                </Button>
+                            </div>
+                            
+                            <div className="flex items-center space-x-1">
+                                <span className="text-sm text-muted-foreground">
+                                    Page {paginationState.currentPage} of {getTotalPages()}
+                                </span>
+                            </div>
+                            
+                            <div className="flex items-center space-x-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleNextPage}
+                                    disabled={paginationState.currentPage === getTotalPages()}
+                                >
+                                    <ChevronRight className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleLastPage}
+                                    disabled={paginationState.currentPage === getTotalPages()}
+                                >
+                                    <ChevronsRight className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </>
+            ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                    <Calendar className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                    <p>No recent bookings</p>
+                </div>
+            )}
+        </div>
+    </CardContent>
+</Card>
 
                     {/* Room Status */}
                     <Card>

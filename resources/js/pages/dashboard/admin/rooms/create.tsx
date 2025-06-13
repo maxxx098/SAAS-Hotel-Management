@@ -374,76 +374,99 @@ function CreateRoomPage({ roomTypes, amenitiesOptions }: CreateRoomProps) {
         handleInputChange('images', [...formData.images, '']);
     };
 
-    const removeImageField = (index: number) => {
+const removeImageField = (index: number) => {
+    if (formData.images.length === 1) {
+        // If only one image field, clear it instead of removing
+        handleInputChange('images', ['']);
+    } else {
         const newImages = formData.images.filter((_, i) => i !== index);
-        handleInputChange('images', newImages.length ? newImages : ['']);
-    };
+        handleInputChange('images', newImages);
+    }
+};
 
     const validateForm = () => {
-        const newErrors: Errors = {};
+    const newErrors: Errors = {};
 
-        if (!formData.name.trim()) newErrors.name = 'Room name is required';
-        if (!formData.type) newErrors.type = 'Room type is required';
-        if (!formData.price_per_night || Number(formData.price_per_night) <= 0) {
-            newErrors.price_per_night = 'Valid price per night is required';
-        }
-        if (!formData.capacity || Number(formData.capacity) < 1 || Number(formData.capacity) > 10) {
-            newErrors.capacity = 'Capacity must be between 1 and 10';
-        }
-        if (!formData.beds || Number(formData.beds) < 1 || Number(formData.beds) > 5) {
-            newErrors.beds = 'Number of beds must be between 1 and 5';
-        }
-        if (formData.size && Number(formData.size) < 0) {
-            newErrors.size = 'Size cannot be negative';
-        }
+    if (!formData.name.trim()) newErrors.name = 'Room name is required';
+    if (!formData.type) newErrors.type = 'Room type is required';
+    if (!formData.price_per_night || Number(formData.price_per_night) <= 0) {
+        newErrors.price_per_night = 'Valid price per night is required';
+    }
+    if (!formData.capacity || Number(formData.capacity) < 1 || Number(formData.capacity) > 10) {
+        newErrors.capacity = 'Capacity must be between 1 and 10';
+    }
+    if (!formData.beds || Number(formData.beds) < 1 || Number(formData.beds) > 5) {
+        newErrors.beds = 'Number of beds must be between 1 and 5';
+    }
+    if (formData.size && Number(formData.size) < 0) {
+        newErrors.size = 'Size cannot be negative';
+    }
 
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
-    };
-
-    const handleSubmit = async () => {
-        if (!validateForm()) return;
-
-        setIsSubmitting(true);
-        
+    // Validate image URLs
+    const nonEmptyImages = formData.images.filter(img => img && img.trim());
+    const invalidImages = nonEmptyImages.filter(img => {
         try {
-            // Filter out empty image URLs
-            const cleanedImages = formData.images.filter(img => img.trim());
-            
-            const submitData = {
-                name: formData.name,
-                description: formData.description || null,
-                type: formData.type,
-                price_per_night: parseFloat(formData.price_per_night),
-                capacity: parseInt(formData.capacity),
-                beds: parseInt(formData.beds),
-                size: formData.size ? parseFloat(formData.size) : null,
-                amenities: formData.amenities,
-                images: cleanedImages,
-                is_available: formData.is_available,
-                is_active: formData.is_active
-            };
-
-            // Submit to Laravel using Inertia
-            router.post(route('admin.rooms.store'), submitData, {
-                onSuccess: () => {
-                    // Success is handled by Laravel redirect
-                },
-                onError: (errors) => {
-                    // Handle validation errors from Laravel
-                    setErrors(errors);
-                    setIsSubmitting(false);
-                },
-                onFinish: () => {
-                    setIsSubmitting(false);
-                }
-            });
-            
-        } catch (error) {
-            console.error('Error creating room:', error);
-            setIsSubmitting(false);
+            new URL(img.trim());
+            return false;
+        } catch {
+            return true;
         }
-    };
+    });
+    
+    if (invalidImages.length > 0) {
+        newErrors.images = 'Please enter valid image URLs';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+};
+   const handleSubmit = async () => {
+    if (!validateForm()) return;
+
+    setIsSubmitting(true);
+    
+    try {
+        // Filter out empty image URLs and validate URLs
+        const cleanedImages = formData.images
+            .filter(img => img && img.trim()) // Remove empty/null/undefined
+            .map(img => img.trim()); // Trim whitespace
+        
+        const submitData = {
+            name: formData.name,
+            description: formData.description || null,
+            type: formData.type,
+            price_per_night: parseFloat(formData.price_per_night),
+            capacity: parseInt(formData.capacity),
+            beds: parseInt(formData.beds),
+            size: formData.size ? parseFloat(formData.size) : null,
+            amenities: formData.amenities,
+            images: cleanedImages, // This could be an empty array now
+            is_available: formData.is_available,
+            is_active: formData.is_active
+        };
+
+        console.log('Submitting data:', submitData); // Debug log
+
+        // Submit to Laravel using Inertia
+        router.post(route('admin.rooms.store'), submitData, {
+            onSuccess: () => {
+                console.log('Room created successfully');
+            },
+            onError: (errors) => {
+                console.log('Validation errors:', errors);
+                setErrors(errors);
+                setIsSubmitting(false);
+            },
+            onFinish: () => {
+                setIsSubmitting(false);
+            }
+        });
+        
+    } catch (error) {
+        console.error('Error creating room:', error);
+        setIsSubmitting(false);
+    }
+};
 
     const handleCancel = () => {
         router.get(route('admin.rooms.index'));
@@ -673,6 +696,7 @@ function CreateRoomPage({ roomTypes, amenitiesOptions }: CreateRoomProps) {
                             Add image URLs for the room gallery
                         </CardDescription>
                     </CardHeader>
+        
                     <CardContent className="space-y-4">
                         {formData.images.map((image, index) => (
                             <div key={index} className="flex gap-2">
@@ -680,7 +704,7 @@ function CreateRoomPage({ roomTypes, amenitiesOptions }: CreateRoomProps) {
                                     placeholder="https://example.com/room-image.jpg"
                                     value={image}
                                     onChange={(e) => handleImageChange(index, e.target.value)}
-                                    className="flex-1"
+                                    className={`flex-1 ${errors.images ? 'border-red-500' : ''}`}
                                 />
                                 {formData.images.length > 1 && (
                                     <Button
@@ -703,7 +727,23 @@ function CreateRoomPage({ roomTypes, amenitiesOptions }: CreateRoomProps) {
                             <Plus className="h-4 w-4 mr-2" />
                             Add Another Image
                         </Button>
-                        {errors.images && <p className="text-sm text-destructive">{errors.images}</p>}
+                        {errors.images && <p className="text-sm text-red-500 mt-2">{errors.images}</p>}
+                        
+                        {/* Add preview of valid images */}
+                        {formData.images.some(img => img.trim()) && (
+                            <div className="mt-4">
+                                <p className="text-sm text-gray-600 mb-2">Image URLs added:</p>
+                                <div className="space-y-1">
+                                    {formData.images
+                                        .filter(img => img.trim())
+                                        .map((img, index) => (
+                                            <p key={index} className="text-xs text-blue-600 truncate">
+                                                {img}
+                                            </p>
+                                        ))}
+                                </div>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
 
