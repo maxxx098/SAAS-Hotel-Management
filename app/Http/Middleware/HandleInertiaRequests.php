@@ -50,7 +50,12 @@ class HandleInertiaRequests extends Middleware
                     'email' => $request->user()->email,
                     'role' => $request->user()->role,
                     'is_admin' => $request->user()->isAdmin(),
+                    'is_staff' => $request->user()->isStaff(),
+                    'can_access_staff_dashboard' => $request->user()->canAccessStaffDashboard(),
                     'role_display_name' => $request->user()->getRoleDisplayName(),
+                    'department' => $request->user()->getDepartment(),
+                    'employee_id' => $request->user()->employee_id ?? null,
+                    'phone' => $request->user()->phone ?? null,
                 ] : null,
             ],
             'ziggy' => fn (): array => [
@@ -58,6 +63,12 @@ class HandleInertiaRequests extends Middleware
                 'location' => $request->url(),
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+            'flash' => [
+                'success' => $request->session()->get('success'),
+                'error' => $request->session()->get('error'),
+                'warning' => $request->session()->get('warning'),
+                'info' => $request->session()->get('info'),
+            ],
         ];
     }
 }

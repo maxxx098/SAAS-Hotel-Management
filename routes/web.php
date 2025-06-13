@@ -5,6 +5,7 @@ use App\Http\Controllers\Client\BookingController;
 use App\Http\Controllers\Admin\BookingController as AdminBookingController;
 use App\Http\Controllers\Admin\RoomController as AdminRoomController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Staff\DashboardController as StaffDashboardController;
 use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\RoomController;
 use Illuminate\Foundation\Application;
@@ -45,6 +46,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/bookings/{booking}/confirmation', [BookingController::class, 'confirmation'])->name('bookings.confirmation');
     Route::post('/bookings/check-availability', [BookingController::class, 'checkAvailability'])->name('bookings.check-availability');
     Route::delete('/bookings/{booking}', [BookingController::class, 'destroy'])->name('bookings.destroy');
+
+    // Staff routes - for staff members only
+    Route::middleware(['staff'])->prefix('staff')->name('staff.')->group(function () {
+        Route::get('/dashboard', [StaffDashboardController::class, 'index'])->name('dashboard');
+        Route::get('/dashboard/stats', [StaffDashboardController::class, 'stats'])->name('dashboard.stats');
+        Route::get('/dashboard/today-tasks', [StaffDashboardController::class, 'todayTasks'])->name('dashboard.today-tasks');
+        Route::get('/dashboard/assigned-rooms', [StaffDashboardController::class, 'assignedRooms'])->name('dashboard.assigned-rooms');
+        Route::get('/dashboard/maintenance-requests', [StaffDashboardController::class, 'maintenanceRequests'])->name('dashboard.maintenance-requests');
+        Route::post('/dashboard/update-task-status', [StaffDashboardController::class, 'updateTaskStatus'])->name('dashboard.update-task-status');
+    });
+    
     // Admin-only routes
     Route::middleware(['admin'])->prefix('admin')->name('admin.')->group(function () {
 

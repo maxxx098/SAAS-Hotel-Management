@@ -22,6 +22,7 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
+        'department', // Add department field
         'google_id', // Add this for Google OAuth
     ];
 
@@ -50,11 +51,43 @@ class User extends Authenticatable
     }
 
     /**
+     * Available user roles
+     */
+    public const ROLES = [
+        'admin' => 'Administrator',
+        'front_desk' => 'Front Desk',
+        'housekeeping' => 'Housekeeping',
+        'maintenance' => 'Maintenance',
+        'security' => 'Security',
+        'staff' => 'General Staff',
+        'user' => 'Guest',
+    ];
+
+    /**
+     * Staff roles (excluding admin and regular users)
+     */
+    public const STAFF_ROLES = [
+        'front_desk',
+        'housekeeping',
+        'maintenance',
+        'security',
+        'staff',
+    ];
+
+    /**
      * Check if user is admin
      */
     public function isAdmin(): bool
     {
         return $this->role === 'admin';
+    }
+
+    /**
+     * Check if user is staff (any staff role)
+     */
+    public function isStaff(): bool
+    {
+        return in_array($this->role, self::STAFF_ROLES) || $this->isAdmin();
     }
 
     /**
@@ -66,15 +99,51 @@ class User extends Authenticatable
     }
 
     /**
+     * Check if user has any of the given roles
+     */
+    public function hasAnyRole(array $roles): bool
+    {
+        return in_array($this->role, $roles);
+    }
+
+    /**
      * Get user role display name
      */
     public function getRoleDisplayName(): string
     {
-        return match($this->role) {
-            'admin' => 'Administrator',
-            'moderator' => 'Moderator',
-            'user' => 'User',
-            default => 'Unknown'
+        return self::ROLES[$this->role] ?? 'Unknown';
+    }
+
+    /**
+     * Check if user can access staff dashboard
+     */
+    public function canAccessStaffDashboard(): bool
+    {
+        return $this->isStaff();
+    }
+
+    /**
+     * Check if user can access admin panel
+     */
+    public function canAccessAdminPanel(): bool
+    {
+        return $this->isAdmin();
+    }
+
+    /**
+     * Get staff department
+     */
+    public function getDepartment(): string
+    {
+        // Return custom department if set, otherwise map from role
+        return $this->department ?? match($this->role) {
+            'front_desk' => 'Front Desk',
+            'housekeeping' => 'Housekeeping',
+            'maintenance' => 'Maintenance',
+            'security' => 'Security',
+            'staff' => 'General',
+            'admin' => 'Administration',
+            default => 'General',
         };
     }
 
@@ -93,5 +162,35 @@ class User extends Authenticatable
     public function canUnlinkGoogle(): bool
     {
         return $this->hasGoogleAccount() && !is_null($this->password);
+    }
+
+    /**
+     * Scope to get only staff users
+     */
+    public function scopeStaff($query)
+    {
+        return $query->whereIn('role', self::STAFF_ROLES);
+    }
+
+    /**
+     * Scope to get users by department
+     */
+    public function scopeByDepartment($query, string $department)
+    {
+        return $query->where('department', $department)
+                    ->orWhere('role', array_search($department, [
+                        'front_desk' => 'Front Desk',
+                        'housekeeping' => 'Housekeeping',
+                        'maintenance' => 'Maintenance',
+                        'security' => 'Security',
+                    ]));
+    }
+
+    /**
+     * Scope to get users by role
+     */
+    public function scopeByRole($query, string $role)
+    {
+        return $query->where('role', $role);
     }
 }

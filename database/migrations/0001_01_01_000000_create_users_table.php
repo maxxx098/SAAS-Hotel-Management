@@ -14,17 +14,22 @@ return new class extends Migration
         Schema::create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->string('notification_email')->nullable()->after('guest_email');
             $table->string('email')->unique();
+            $table->string('phone')->nullable();
+            $table->string('notification_email')->nullable();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             $table->string('role')->default('user');
-            $table->string('google_id')->nullable()->unique(); 
+            $table->string('department')->nullable();
+            $table->string('employee_id')->nullable()->unique();
+            $table->string('google_id')->nullable()->unique();
+
             $table->rememberToken();
             $table->timestamps();
-            
-            // Add index for Google ID lookups
+
+            // Add indexes for lookups
             $table->index('google_id');
+            $table->index('employee_id');
         });
 
         Schema::create('password_reset_tokens', function (Blueprint $table) {

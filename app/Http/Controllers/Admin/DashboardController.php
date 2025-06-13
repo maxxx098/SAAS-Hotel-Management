@@ -18,76 +18,86 @@ class DashboardController extends Controller
     /**
      * Display the unified dashboard based on user role.
      */
-            public function index(): Response
-            {
-                try {
-                    $user = auth()->user();
-                    $isAdmin = $this->isAdmin($user);
-                    
-                    if ($isAdmin) {
-                        // Admin Dashboard
-                        $dashboardData = $this->getAdminDashboardData();
-                        
-                        return Inertia::render('dashboard/admin/index', [
-                            'dashboardData' => $dashboardData,
-                            'userRole' => $user->role ?? 'admin',
-                            'isAdmin' => true,
-                        ]);
-                    } else {
-                        // User Dashboard - Return data in the exact format React component expects
-                        $dashboardData = $this->getUserDashboardData($user->id);
-                        
-                        return Inertia::render('dashboard/user/index', [
-                            'user' => [
-                                'id' => $user->id,
-                                'name' => $user->name,
-                                'email' => $user->email,
-                                'phone' => $user->phone ?? null,
-                                'member_since' => $user->created_at ? $user->created_at->format('Y-m-d') : null,
-                            ],
-                            'userStats' => $dashboardData['userStats'],
-                            'recentBookings' => $dashboardData['recentBookings'],
-                            'upcomingBookings' => $dashboardData['upcomingBookings'],
-                            'hotelServices' => $dashboardData['hotelServices'],
-                            'notifications' => $dashboardData['notifications'] ?? [],
-                        ]);
-                    }
-                } catch (\Exception $e) {
-                    Log::error('Dashboard data fetch error', [
-                        'error' => $e->getMessage(),
-                        'user_id' => auth()->id(),
-                    ]);
-
-                    // Return error state with proper structure
-                    $user = auth()->user();
-                    $isAdmin = $this->isAdmin($user);
-                    
-                    if ($isAdmin) {
-                        return Inertia::render('dashboard/admin/index', [
-                            'dashboardData' => $this->getEmptyDashboardData(),
-                            'userRole' => $user->role ?? 'admin',
-                            'isAdmin' => true,
-                            'error' => 'Failed to load dashboard data',
-                        ]);
-                    } else {
-                        return Inertia::render('dashboard/user/index', [
-                            'user' => [
-                                'id' => $user->id,
-                                'name' => $user->name,
-                                'email' => $user->email,
-                                'phone' => $user->phone ?? null,
-                                'member_since' => $user->created_at ? $user->created_at->format('Y-m-d') : null,
-                            ],
-                            'userStats' => $this->getEmptyUserStats(),
-                            'recentBookings' => [],
-                            'upcomingBookings' => [],
-                            'hotelServices' => $this->getDefaultHotelServices(),
-                            'notifications' => [],
-                            'error' => 'Failed to load dashboard data',
-                        ]);
-                    }
-                }
+           public function index(): Response
+    {
+        try {
+            $user = auth()->user();
+            $isAdmin = $this->isAdmin($user);
+            $isStaff = $this->isStaff($user);
+            
+            if ($isAdmin) {
+                // Admin Dashboard
+                $dashboardData = $this->getAdminDashboardData();
+                
+                return Inertia::render('dashboard/admin/index', [
+                    'dashboardData' => $dashboardData,
+                    'userRole' => $user->role ?? 'admin',
+                    'isAdmin' => true,
+                ]);
+            } elseif ($isStaff) {
+                // Staff Dashboard - render a minimal staff dashboard Inertia page
+                return Inertia::render('dashboard/staff/index', [
+                    'userRole' => $user->role ?? 'staff',
+                    'isStaff' => true,
+                ]);
+            } else {
+                // User Dashboard - Return data in the exact format React component expects
+                $dashboardData = $this->getUserDashboardData($user->id);
+                
+                return Inertia::render('dashboard/user/index', [
+                    'user' => [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                        'email' => $user->email,
+                        'phone' => $user->phone ?? null,
+                        'member_since' => $user->created_at ? $user->created_at->format('Y-m-d') : null,
+                    ],
+                    'userStats' => $dashboardData['userStats'],
+                    'recentBookings' => $dashboardData['recentBookings'],
+                    'upcomingBookings' => $dashboardData['upcomingBookings'],
+                    'hotelServices' => $dashboardData['hotelServices'],
+                    'notifications' => $dashboardData['notifications'] ?? [],
+                ]);
             }
+        } catch (\Exception $e) {
+            Log::error('Dashboard data fetch error', [
+                'error' => $e->getMessage(),
+                'user_id' => auth()->id(),
+            ]);
+
+            // Return error state with proper structure
+            $user = auth()->user();
+            $isAdmin = $this->isAdmin($user);
+            $isStaff = $this->isStaff($user);
+            
+            if ($isAdmin) {
+                return Inertia::render('dashboard/admin/index', [
+                    'dashboardData' => $this->getEmptyDashboardData(),
+                    'userRole' => $user->role ?? 'admin',
+                    'isAdmin' => true,
+                    'error' => 'Failed to load dashboard data',
+                ]);
+            } elseif ($isStaff) {
+                return redirect()->route('staff.dashboard');
+            } else {
+                return Inertia::render('dashboard/user/index', [
+                    'user' => [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                        'email' => $user->email,
+                        'phone' => $user->phone ?? null,
+                        'member_since' => $user->created_at ? $user->created_at->format('Y-m-d') : null,
+                    ],
+                    'userStats' => $this->getEmptyUserStats(),
+                    'recentBookings' => [],
+                    'upcomingBookings' => [],
+                    'hotelServices' => $this->getDefaultHotelServices(),
+                    'notifications' => [],
+                    'error' => 'Failed to load dashboard data',
+                ]);
+            }
+        }
+    }
 
         /**
          * Get dashboard statistics based on user role.
@@ -286,6 +296,19 @@ class DashboardController extends Controller
                $user->role === 'admin' ?? 
                $user->role === 'super_admin' ?? 
                false;
+    }
+
+    /**
+     * Check if user is staff.
+     */
+    private function isStaff($user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        // Check for staff role or indicator
+        return ($user->role ?? null) === 'staff' || ($user->is_staff ?? false);
     }
 
     /**
