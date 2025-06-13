@@ -66,11 +66,7 @@ const getMainNavItems = (isAdmin: boolean, isStaff: boolean): NavItem[] => {
         );
     } else {
         baseItems.push(
-            {
-                title: 'Profile',
-                href: route('profile'),
-                icon: UserIcon,
-            }
+           
         );
     }
     if (isAdmin) {
