@@ -206,27 +206,30 @@ export default function UserBookingManagement({ bookings, filters }: Props) {
     };
 
     const handleCancelBooking = (bookingId: number) => {
-        setIsProcessing(true);
-        router.delete(route('bookings.destroy', bookingId), {
-            onSuccess: () => {
-                setIsCancelDialogOpen(false);
-                setBookingToCancel(null);
-                setIsProcessing(false);
-                toast({
-                    title: "Booking Cancelled",
-                    description: "Your booking has been cancelled successfully.",
-                });
-            },
-            onError: () => {
-                setIsProcessing(false);
-                toast({
-                    title: "Cancellation Failed",
-                    description: "Failed to cancel booking. Please try again.",
-                    variant: "destructive",
-                });
-            }
-        });
-    };
+    setIsProcessing(true);
+    router.delete(route('bookings.destroy', bookingId), {
+        onSuccess: () => {
+            setIsProcessing(false);
+            setIsCancelDialogOpen(false);
+            setBookingToCancel(null);
+            toast({
+                title: "Booking Cancelled",
+                description: "Your booking has been cancelled successfully.",
+            });
+        },
+        onError: () => {
+            setIsProcessing(false);
+            toast({
+                title: "Cancellation Failed",
+                description: "Failed to cancel booking. Please try again.",
+                variant: "destructive",
+            });
+        },
+        onFinish: () => {
+            setIsProcessing(false);
+        }
+    });
+};
 
     const handleStatusFilter = (status: string) => {
         router.get(route('bookings.index'), { status: status === filters.status ? '' : status }, {

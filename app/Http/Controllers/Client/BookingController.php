@@ -248,4 +248,33 @@ public function checkAvailability(Request $request)
 
         return response()->json($stats);
     }
+    /**
+ * Cancel a booking
+ */
+public function destroy(Booking $booking)
+{
+    // Ensure user can only cancel their own bookings
+    if ($booking->user_id !== Auth::id()) {
+        abort(403);
+    }
+
+    // Check if booking can be cancelled
+    if (!in_array($booking->status, ['pending', 'confirmed'])) {
+        return back()->withErrors(['error' => 'This booking cannot be cancelled.']);
+    }
+
+    // Check if check-in date is in the future
+    if (Carbon::parse($booking->check_in)->isPast()) {
+        return back()->withErrors(['error' => 'Cannot cancel booking after check-in date.']);
+    }
+
+    try {
+        $booking->update(['status' => 'cancelled']);
+        
+        return redirect()->route('bookings.index')->with('success', 'Booking cancelled successfully.');
+    } catch (\Exception $e) {
+        \Log::error('Booking cancellation failed: ' . $e->getMessage());
+        return back()->withErrors(['error' => 'Failed to cancel booking. Please try again.']);
+    }
+}
 }

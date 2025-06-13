@@ -28,7 +28,6 @@ Route::post('/auth/google', [GoogleAuthController::class, 'handleGoogleLogin'])-
 
 Route::middleware(['auth', 'verified'])->group(function () {
     
-    // Single dashboard for both roles
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     
     // Dashboard API routes - accessible to both roles
@@ -45,7 +44,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/bookings/stats/dashboard', [BookingController::class, 'stats'])->name('bookings.stats');
     Route::get('/bookings/{booking}/confirmation', [BookingController::class, 'confirmation'])->name('bookings.confirmation');
     Route::post('/bookings/check-availability', [BookingController::class, 'checkAvailability'])->name('bookings.check-availability');
-
+    Route::delete('/bookings/{booking}', [BookingController::class, 'destroy'])->name('bookings.destroy');
     // Admin-only routes
     Route::middleware(['admin'])->prefix('admin')->name('admin.')->group(function () {
 
