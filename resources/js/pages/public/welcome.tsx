@@ -164,7 +164,7 @@ export default function Welcome() {
                     <CardContent className="py-16">
                         <div className="text-center space-y-4 mb-16">
                             <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-white">
-                                Trusted by hotels worldwides
+                                Trusted by hotels worldwide
                             </h2>
                             <p className="text-lg text-blue-100 max-w-2xl mx-auto">
                                 Join thousands of hotels that have transformed their operations with our platform.
