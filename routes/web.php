@@ -62,6 +62,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::match(['patch', 'put'], '/staff/{staff}', [StaffController::class, 'update'])->name('staff.update');
         Route::delete('/staff/{staff}', [StaffController::class, 'destroy'])->name('staff.destroy');
 
+        // NEW: Admin task management routes
+        Route::get('/tasks', [StaffController::class, 'tasks'])->name('tasks.index');
+        Route::post('/tasks', [StaffController::class, 'storeTask'])->name('tasks.store');
+        Route::put('/tasks/{task}', [StaffController::class, 'updateTask'])->name('tasks.update');
+        Route::delete('/tasks/{task}', [StaffController::class, 'destroyTask'])->name('tasks.destroy');
+        Route::patch('/tasks/{task}/status', [StaffController::class, 'updateTaskStatus'])->name('tasks.update-status');
+
         // Admin bookings routes
         Route::get('/bookings', [AdminBookingController::class, 'index'])->name('bookings');
         Route::get('/bookings/{booking}', [AdminBookingController::class, 'show'])->name('bookings.show');
@@ -83,6 +90,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/dashboard/monthly-revenue', [StaffDashboardController::class, 'monthlyRevenue'])->name('dashboard.monthly-revenue');
         Route::get('/dashboard/recent-bookings', [StaffDashboardController::class, 'recentBookings'])->name('dashboard.recent-bookings');
         Route::get('/dashboard/room-distribution', [StaffDashboardController::class, 'roomTypeDistribution'])->name('dashboard.room-distribution');
+        
+        // NEW: Staff task routes (for staff to view and update their own tasks)
+        Route::patch('/tasks/{task}/status', [StaffController::class, 'updateTaskStatus'])->name('tasks.update-status');
     });
     
     // Client dashboard routes - for regular users/clients

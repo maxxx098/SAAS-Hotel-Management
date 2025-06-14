@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\StaffTask; 
+use App\Models\Room; 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
@@ -72,7 +74,7 @@ class StaffController extends Controller
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
-            'username' => 'required|string|max:255|unique:users|alpha_dash', // Added username validation
+            'username' => 'required|string|max:255|unique:users|alpha_dash',
             'password' => 'required|string|min:8|confirmed',
             'role' => ['required', Rule::in(User::STAFF_ROLES)],
             'department' => 'nullable|string|max:255',
@@ -88,7 +90,7 @@ class StaffController extends Controller
             $staff = User::create([
                 'name' => $request->name,
                 'email' => $request->email,
-                'username' => $request->username, // Added username
+                'username' => $request->username,
                 'password' => Hash::make($request->password),
                 'role' => $request->role,
                 'department' => $request->department ?: $this->getDepartmentFromRole($request->role),
@@ -109,7 +111,6 @@ class StaffController extends Controller
      */
     public function show(User $staff): Response
     {
-        // Ensure we're only showing staff members
         if (!$staff->isStaff()) {
             abort(404);
         }
@@ -148,7 +149,7 @@ class StaffController extends Controller
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users')->ignore($staff->id)],
-            'username' => ['required', 'string', 'max:255', 'alpha_dash', Rule::unique('users')->ignore($staff->id)], // Added username validation
+            'username' => ['required', 'string', 'max:255', 'alpha_dash', Rule::unique('users')->ignore($staff->id)],
             'password' => 'nullable|string|min:8|confirmed',
             'role' => ['required', Rule::in(User::STAFF_ROLES)],
             'department' => 'nullable|string|max:255',
@@ -164,14 +165,13 @@ class StaffController extends Controller
             $updateData = [
                 'name' => $request->name,
                 'email' => $request->email,
-                'username' => $request->username, // Added username
+                'username' => $request->username,
                 'role' => $request->role,
                 'department' => $request->department ?: $this->getDepartmentFromRole($request->role),
                 'employee_id' => $request->employee_id,
                 'phone' => $request->phone,
             ];
 
-            // Only update password if provided
             if ($request->filled('password')) {
                 $updateData['password'] = Hash::make($request->password);
             }
@@ -206,6 +206,181 @@ class StaffController extends Controller
         }
     }
 
+    // ===== TASK MANAGEMENT METHODS =====
+
+    /**
+     * Display task assignment page
+     */
+    public function tasks(Request $request): Response
+    {
+        $query = StaffTask::with(['assignedStaff:id,name,role,department', 'room:id,number,type'])
+            ->orderBy('scheduled_date', 'asc')
+            ->orderBy('priority', 'desc');
+
+        // Apply filters
+        if ($request->filled('department')) {
+            $query->whereHas('assignedStaff', function ($q) use ($request) {
+                $q->where('department', $request->department);
+            });
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->filled('priority')) {
+            $query->where('priority', $request->priority);
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%")
+                  ->orWhereHas('assignedStaff', function ($staffQuery) use ($search) {
+                      $staffQuery->where('name', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        $tasks = $query->get();
+
+        return Inertia::render('dashboard/staff/add', [
+            'tasks' => $tasks,
+            'staff' => User::staff()->select('id', 'name', 'role', 'department', 'employee_id')->get(),
+            'rooms' => Room::select('id', 'number', 'type', 'status')->get(), // Adjust based on your Room model
+            'taskTypes' => $this->getTaskTypes(),
+            'departments' => $this->getDepartments(),
+            'filters' => $request->only(['department', 'status', 'priority', 'search']),
+        ]);
+    }
+
+    /**
+     * Store a new task assignment
+     */
+    public function storeTask(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'type' => 'required|string|in:' . implode(',', $this->getTaskTypes()),
+            'priority' => 'required|string|in:low,medium,high,urgent',
+            'assigned_to' => 'required|exists:users,id',
+            'room_id' => 'nullable|exists:rooms,id',
+            'scheduled_date' => 'required|date|after_or_equal:today',
+            'scheduled_time' => 'nullable|date_format:H:i',
+            'estimated_duration' => 'required|integer|min:15',
+            'location' => 'nullable|string|max:255',
+        ]);
+
+        if ($validator->fails()) {
+            return back()->withErrors($validator)->withInput();
+        }
+
+        try {
+            Task::create([
+                'title' => $request->title,
+                'description' => $request->description,
+                'type' => $request->type,
+                'priority' => $request->priority,
+                'status' => 'pending',
+                'assigned_to' => $request->assigned_to,
+                'room_id' => $request->room_id,
+                'scheduled_date' => $request->scheduled_date,
+                'scheduled_time' => $request->scheduled_time,
+                'estimated_duration' => $request->estimated_duration,
+                'location' => $request->location,
+                'created_by' => auth()->id(),
+            ]);
+
+            return back()->with('success', 'Task assigned successfully.');
+
+        } catch (\Exception $e) {
+            return back()->withErrors(['error' => 'Failed to assign task. Please try again.']);
+        }
+    }
+
+    /**
+     * Update an existing task
+     */
+    public function updateTask(Request $request, Task $task)
+    {
+        $validator = Validator::make($request->all(), [
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'type' => 'required|string|in:' . implode(',', $this->getTaskTypes()),
+            'priority' => 'required|string|in:low,medium,high,urgent',
+            'assigned_to' => 'required|exists:users,id',
+            'room_id' => 'nullable|exists:rooms,id',
+            'scheduled_date' => 'required|date',
+            'scheduled_time' => 'nullable|date_format:H:i',
+            'estimated_duration' => 'required|integer|min:15',
+            'location' => 'nullable|string|max:255',
+            'status' => 'nullable|string|in:pending,in_progress,completed,cancelled',
+        ]);
+
+        if ($validator->fails()) {
+            return back()->withErrors($validator)->withInput();
+        }
+
+        try {
+            $task->update([
+                'title' => $request->title,
+                'description' => $request->description,
+                'type' => $request->type,
+                'priority' => $request->priority,
+                'status' => $request->status ?? $task->status,
+                'assigned_to' => $request->assigned_to,
+                'room_id' => $request->room_id,
+                'scheduled_date' => $request->scheduled_date,
+                'scheduled_time' => $request->scheduled_time,
+                'estimated_duration' => $request->estimated_duration,
+                'location' => $request->location,
+            ]);
+
+            return back()->with('success', 'Task updated successfully.');
+
+        } catch (\Exception $e) {
+            return back()->withErrors(['error' => 'Failed to update task. Please try again.']);
+        }
+    }
+
+    /**
+     * Delete a task
+     */
+    public function destroyTask(Task $task)
+    {
+        try {
+            $task->delete();
+            return back()->with('success', 'Task deleted successfully.');
+        } catch (\Exception $e) {
+            return back()->withErrors(['error' => 'Failed to delete task. Please try again.']);
+        }
+    }
+
+    /**
+     * Update task status (for staff to update their own tasks)
+     */
+    public function updateTaskStatus(Request $request, Task $task)
+    {
+        $request->validate([
+            'status' => 'required|string|in:pending,in_progress,completed,cancelled',
+        ]);
+
+        try {
+            $task->update([
+                'status' => $request->status,
+                'completed_at' => $request->status === 'completed' ? now() : null,
+            ]);
+
+            return back()->with('success', 'Task status updated successfully.');
+        } catch (\Exception $e) {
+            return back()->withErrors(['error' => 'Failed to update task status.']);
+        }
+    }
+
+    // ===== HELPER METHODS =====
+
     /**
      * Get department name from role
      */
@@ -219,6 +394,39 @@ class StaffController extends Controller
             'staff' => 'General',
             default => 'General',
         };
+    }
+
+    /**
+     * Get all available departments
+     */
+    private function getDepartments(): array
+    {
+        return [
+            'Front Desk',
+            'Housekeeping',
+            'Maintenance',
+            'Security',
+            'General',
+        ];
+    }
+
+    /**
+     * Get all available task types
+     */
+    private function getTaskTypes(): array
+    {
+        return [
+            'cleaning',
+            'maintenance',
+            'inspection',
+            'delivery',
+            'setup',
+            'security_check',
+            'guest_request',
+            'inventory',
+            'training',
+            'other',
+        ];
     }
 
     /**

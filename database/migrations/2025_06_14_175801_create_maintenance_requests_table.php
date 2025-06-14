@@ -23,6 +23,10 @@ return new class extends Migration
             $table->foreignId('assigned_to')->nullable()->constrained('users')->onDelete('set null');
             $table->integer('estimated_time')->nullable()->comment('Estimated time in minutes');
             $table->timestamp('completed_at')->nullable();
+            $table->datetime('assigned_at')->nullable();
+            $table->datetime('started_at')->nullable();
+            $table->integer('estimated_duration')->nullable();
+            $table->integer('actual_duration')->nullable();
             $table->text('notes')->nullable();
             $table->enum('category', [
                 'plumbing',

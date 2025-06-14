@@ -15,7 +15,12 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->nullable()->constrained()->onDelete('set null');
             $table->foreignId('room_id')->nullable()->constrained()->onDelete('set null');
-            
+            $table->boolean('check_in_completed')->default(false);
+            $table->boolean('check_out_completed')->default(false);
+            $table->datetime('actual_check_in')->nullable();
+            $table->datetime('actual_check_out')->nullable();
+            $table->foreignId('checked_in_by')->nullable()->constrained('users')->onDelete('set null');
+            $table->foreignId('checked_out_by')->nullable()->constrained('users')->onDelete('set null');
             // Guest information
             $table->string('guest_name');
             $table->string('guest_email');

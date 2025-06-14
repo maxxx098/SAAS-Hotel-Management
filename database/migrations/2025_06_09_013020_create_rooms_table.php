@@ -11,6 +11,7 @@ return new class extends Migration
     {
         Schema::create('rooms', function (Blueprint $table) {
             $table->id();
+            $table->string('number')->unique(); // Room number (e.g., "101", "A-205")
             $table->string('name');
             $table->text('description')->nullable();
             $table->string('type'); // single, double, suite, etc.
@@ -22,6 +23,21 @@ return new class extends Migration
             $table->json('images')->nullable(); // array of image URLs
             $table->boolean('is_available')->default(true);
             $table->boolean('is_active')->default(true);
+            $table->enum('status', [
+                'available',
+                'occupied',
+                'maintenance',
+                'out_of_order'
+            ])->default('available'); // Added status column
+            $table->enum('cleaning_status', [
+                'clean', 
+                'dirty', 
+                'out_of_order', 
+                'in_progress', 
+                'inspection_required'
+            ])->default('clean');
+            $table->datetime('last_cleaned')->nullable();
+            $table->foreignId('last_cleaned_by')->nullable()->constrained('users')->onDelete('set null');
             $table->timestamps();
         });
     }

@@ -18,11 +18,11 @@ import {
     BarChart3, 
     FileText, 
     Shield,
+    ClipboardList,
     User as UserIcon, 
     Building,
     Calendar,
     Wrench,
-    ClipboardList
 } from 'lucide-react';
 import AppLogo from './app-logo';
 
@@ -84,6 +84,11 @@ const getMainNavItems = (isAdmin: boolean, isStaff: boolean, userRole: string): 
                 title: 'Staff Management',
                 href: route('admin.staff.index'),
                 icon: Users,
+            },
+            {
+                title: 'Task Management',
+                href: route('admin.tasks.index'),
+                icon: ClipboardList,
             },
         ];
         
