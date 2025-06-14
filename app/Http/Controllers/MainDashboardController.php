@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use App\Models\User;
 
 class MainDashboardController extends Controller
 {
@@ -41,6 +42,18 @@ class MainDashboardController extends Controller
      */
     private function isStaff($user): bool
     {
-        return $user && ($user->role === 'staff' || $user->is_staff);
+        // Use the User model's isStaff() method or check against all staff roles
+        if ($user && method_exists($user, 'isStaff')) {
+            return $user->isStaff();
+        }
+        
+        // Fallback: check against all staff roles defined in User model
+        return $user && in_array($user->role, User::STAFF_ROLES ?? [
+            'staff',
+            'front_desk', 
+            'housekeeping', 
+            'maintenance', 
+            'security'
+        ]);
     }
 }

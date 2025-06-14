@@ -81,6 +81,11 @@ const getMainNavItems = (isAdmin: boolean, isStaff: boolean): NavItem[] => {
                 href: route('admin.rooms.index'),
                 icon: Building,
             },
+            {
+                title: 'Staffs',
+                href: route('admin.staff.index'),
+                icon: Building,
+            },
         ];
         
         return [...baseItems, ...adminItems];

@@ -20,9 +20,12 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'username', // Added username field
         'password',
         'role',
-        'department', // Add department field
+        'department',
+        'employee_id',
+        'phone', // Added phone field
         'google_id', // Add this for Google OAuth
     ];
 
@@ -165,6 +168,25 @@ class User extends Authenticatable
     }
 
     /**
+     * Override findForPassport to allow login with username OR employee_id
+     * This is used by Laravel Passport, but also works for regular authentication
+     */
+    public function findForPassport($username)
+    {
+        return $this->where('username', $username)
+                   ->orWhere('employee_id', $username)
+                   ->first();
+    }
+
+    /**
+     * Get user's login identifier (username or employee_id)
+     */
+    public function getLoginIdentifier(): string
+    {
+        return $this->username ?? $this->employee_id ?? $this->email;
+    }
+
+    /**
      * Scope to get only staff users
      */
     public function scopeStaff($query)
@@ -192,5 +214,14 @@ class User extends Authenticatable
     public function scopeByRole($query, string $role)
     {
         return $query->where('role', $role);
+    }
+
+    /**
+     * Scope to find user by username or employee_id
+     */
+    public function scopeByUsernameOrEmployeeId($query, string $identifier)
+    {
+        return $query->where('username', $identifier)
+                    ->orWhere('employee_id', $identifier);
     }
 }

@@ -6,10 +6,12 @@ use App\Http\Controllers\Client\ClientDashboardController;
 use App\Http\Controllers\Admin\BookingController as AdminBookingController;
 use App\Http\Controllers\Admin\RoomController as AdminRoomController;
 use App\Http\Controllers\Admin\AdminDashboardController;
+use App\Http\Controllers\Admin\StaffController;
 use App\Http\Controllers\Staff\StaffDashboardController;
 use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\RoomController;
 use App\Http\Controllers\MainDashboardController; 
+use App\Http\Controllers\Auth\StaffAuthenticatedSessionController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -29,6 +31,13 @@ Route::get('/rooms/{room}', [RoomController::class, 'show'])->name('rooms.show')
 
 Route::post('/auth/google', [GoogleAuthController::class, 'handleGoogleLogin'])->name('google.login');
 
+Route::middleware('guest')->group(function () {
+    Route::get('/staff/login', [StaffAuthenticatedSessionController::class, 'create'])
+        ->name('staff.login');
+        
+    Route::post('/staff/login', [StaffAuthenticatedSessionController::class, 'store']);
+});
+
 Route::middleware(['auth', 'verified'])->group(function () {
     
     // Main dashboard route - redirects based on user role
@@ -43,7 +52,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/dashboard/recent-bookings', [AdminDashboardController::class, 'recentBookings'])->name('dashboard.recent-bookings');
         Route::get('/dashboard/monthly-revenue', [AdminDashboardController::class, 'monthlyRevenue'])->name('dashboard.monthly-revenue');
         Route::get('/dashboard/room-distribution', [AdminDashboardController::class, 'roomTypeDistribution'])->name('dashboard.room-distribution');
-        
+
+        // Admin staff routes
+        Route::get('/staff', [StaffController::class, 'index'])->name('staff.index');
+        Route::get('/staff/create', [StaffController::class, 'create'])->name('staff.create');
+        Route::post('/staff', [StaffController::class, 'store'])->name('staff.store');
+        Route::get('/staff/{staff}', [StaffController::class, 'show'])->name('staff.show');
+        Route::get('/staff/{staff}/edit', [StaffController::class, 'edit'])->name('staff.edit');
+        Route::match(['patch', 'put'], '/staff/{staff}', [StaffController::class, 'update'])->name('staff.update');
+        Route::delete('/staff/{staff}', [StaffController::class, 'destroy'])->name('staff.destroy');
+
         // Admin bookings routes
         Route::get('/bookings', [AdminBookingController::class, 'index'])->name('bookings');
         Route::get('/bookings/{booking}', [AdminBookingController::class, 'show'])->name('bookings.show');

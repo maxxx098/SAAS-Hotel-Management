@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('email')->unique();
+            $table->string('username')->unique()->nullable(); 
             $table->string('phone')->nullable();
             $table->string('notification_email')->nullable();
             $table->timestamp('email_verified_at')->nullable();
@@ -30,6 +31,7 @@ return new class extends Migration
             // Add indexes for lookups
             $table->index('google_id');
             $table->index('employee_id');
+            $table->index('username'); 
         });
 
         Schema::create('password_reset_tokens', function (Blueprint $table) {
