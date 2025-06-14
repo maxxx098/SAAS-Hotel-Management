@@ -22,11 +22,9 @@ class StaffMiddleware
 
         $user = $request->user();
         
-        // Define staff roles - adjust these based on your system
-        $staffRoles = ['staff', 'front_desk', 'housekeeping', 'maintenance', 'security'];
-        
-        // Check if user has a staff role
-        if (!in_array($user->role, $staffRoles)) {
+        // Use the STAFF_ROLES constant from User model for consistency
+        // Or check if user is staff using the model method
+        if (!$user->isStaff()) {
             // Redirect to dashboard with error for Inertia
             return redirect()->route('dashboard')->with('error', 'Access denied. Staff privileges required.');
         }

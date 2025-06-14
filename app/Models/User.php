@@ -61,6 +61,7 @@ class User extends Authenticatable
         'front_desk' => 'Front Desk',
         'housekeeping' => 'Housekeeping',
         'maintenance' => 'Maintenance',
+        'general_staff' => 'General Staff',
         'security' => 'Security',
         'staff' => 'General Staff',
         'user' => 'Guest',
@@ -75,6 +76,7 @@ class User extends Authenticatable
         'maintenance',
         'security',
         'staff',
+        'general_staff',
     ];
 
     /**
@@ -141,10 +143,11 @@ class User extends Authenticatable
         // Return custom department if set, otherwise map from role
         return $this->department ?? match($this->role) {
             'front_desk' => 'Front Desk',
+            'general_staff' => 'General Staff',
             'housekeeping' => 'Housekeeping',
             'maintenance' => 'Maintenance',
             'security' => 'Security',
-            'staff' => 'General',
+            'staff' => 'General Staff',
             'admin' => 'Administration',
             default => 'General',
         };
@@ -202,6 +205,7 @@ class User extends Authenticatable
         return $query->where('department', $department)
                     ->orWhere('role', array_search($department, [
                         'front_desk' => 'Front Desk',
+                        'general_staff' => 'General Staff',
                         'housekeeping' => 'Housekeeping',
                         'maintenance' => 'Maintenance',
                         'security' => 'Security',
