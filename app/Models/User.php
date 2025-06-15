@@ -6,6 +6,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class User extends Authenticatable
 {
@@ -27,6 +28,7 @@ class User extends Authenticatable
         'employee_id',
         'phone', // Added phone field
         'google_id', // Add this for Google OAuth
+        'hire_date', // Add hire_date field
     ];
 
     /**
@@ -50,6 +52,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'hire_date' => 'date',
         ];
     }
 
@@ -187,6 +190,55 @@ class User extends Authenticatable
     public function getLoginIdentifier(): string
     {
         return $this->username ?? $this->employee_id ?? $this->email;
+    }
+
+    /**
+     * Get the user's activity logs.
+     */
+    public function activityLogs(): HasMany
+    {
+        return $this->hasMany(ActivityLog::class);
+    }
+
+    /**
+     * Log an activity for this user.
+     */
+    public function logActivity(string $type, string $title, string $description = null, array $data = null): ActivityLog
+    {
+        return ActivityLog::create([
+            'user_id' => $this->id,
+            'type' => $type,
+            'title' => $title,
+            'description' => $description,
+            'data' => $data,
+            'ip_address' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ]);
+    }
+
+    /**
+     * Get recent activity logs for this user.
+     */
+    public function getRecentActivities(int $limit = 10): \Illuminate\Database\Eloquent\Collection
+    {
+        return $this->activityLogs()
+                   ->orderBy('created_at', 'desc')
+                   ->limit($limit)
+                   ->get();
+    }
+
+    /**
+     * Get activity logs by type.
+     */
+    public function getActivitiesByType(string $type, int $limit = null): \Illuminate\Database\Eloquent\Collection
+    {
+        $query = $this->activityLogs()->where('type', $type)->orderBy('created_at', 'desc');
+        
+        if ($limit) {
+            $query->limit($limit);
+        }
+        
+        return $query->get();
     }
 
     /**

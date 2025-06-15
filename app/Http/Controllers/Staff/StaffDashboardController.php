@@ -650,35 +650,72 @@ class StaffDashboardController extends Controller
      * Get maintenance tasks - REAL DATA
      */
     private function getMaintenanceTasks($user, $today): array
-    {
-        $tasks = [];
+{
+    $tasks = [];
 
-        $maintenanceRequests = MaintenanceRequest::with(['room', 'reportedBy'])
-            ->where('assigned_to', $user->id)
-            ->whereIn('status', ['pending', 'in_progress'])
-            ->orderBy('priority', 'desc')
-            ->orderBy('created_at', 'asc')
-            ->limit(10)
-            ->get();
+    // Get StaffTask records for maintenance staff (from admin assignments)
+    $staffTasks = StaffTask::with(['room'])
+        ->where('assigned_to', $user->id)
+        ->whereIn('status', ['pending', 'in_progress'])
+        ->orderBy('priority', 'desc')
+        ->orderBy('created_at', 'asc')
+        ->limit(10)
+        ->get();
 
-        foreach ($maintenanceRequests as $request) {
-            $tasks[] = [
-                'id' => $request->id,
-                'type' => 'maintenance',
-                'title' => $request->title ?? 'Maintenance Request',
-                'description' => $request->description ?? 'No description',
-                'time' => $request->created_at->format('H:i'),
-                'priority' => $request->priority ?? 'medium',
-                'status' => $request->status ?? 'pending',
-                'room_number' => $request->room->number ?? 'N/A',
-                'location' => $request->location ?? 'Room',
-                'reported_by' => $request->reportedBy->name ?? 'System',
-                'estimated_duration' => $request->estimated_duration ?? 60,
-            ];
-        }
-
-        return $tasks;
+    foreach ($staffTasks as $task) {
+        $tasks[] = [
+            'id' => $task->id,
+            'type' => 'staff_task', // Distinguish from maintenance requests
+            'title' => $task->title,
+            'description' => $task->description ?? 'No description',
+            'time' => $task->scheduled_at ? Carbon::parse($task->scheduled_at)->format('H:i') : 'TBD',
+            'priority' => $task->priority ?? 'medium',
+            'status' => $task->status ?? 'pending',
+            'room_number' => $task->room->number ?? 'N/A',
+            'estimated_duration' => $task->estimated_duration ?? 60,
+            'task_type' => $task->type,
+        ];
     }
+
+    // Also get actual MaintenanceRequest records (if you have them)
+    $maintenanceRequests = MaintenanceRequest::with(['room', 'reportedBy'])
+        ->where('assigned_to', $user->id)
+        ->whereIn('status', ['pending', 'in_progress'])
+        ->orderBy('priority', 'desc')
+        ->orderBy('created_at', 'asc')
+        ->limit(10)
+        ->get();
+
+    foreach ($maintenanceRequests as $request) {
+        $tasks[] = [
+            'id' => $request->id,
+            'type' => 'maintenance_request', // Distinguish from staff tasks
+            'title' => $request->title ?? 'Maintenance Request',
+            'description' => $request->description ?? 'No description',
+            'time' => $request->created_at->format('H:i'),
+            'priority' => $request->priority ?? 'medium',
+            'status' => $request->status ?? 'pending',
+            'room_number' => $request->room->number ?? 'N/A',
+            'location' => $request->location ?? 'Room',
+            'reported_by' => $request->reportedBy->name ?? 'System',
+            'estimated_duration' => $request->estimated_duration ?? 60,
+        ];
+    }
+
+    // Sort all tasks by priority and creation time
+    usort($tasks, function($a, $b) {
+        $priorityOrder = ['urgent' => 4, 'high' => 3, 'medium' => 2, 'low' => 1];
+        $aPriority = $priorityOrder[$a['priority']] ?? 1;
+        $bPriority = $priorityOrder[$b['priority']] ?? 1;
+        
+        if ($aPriority === $bPriority) {
+            return 0;
+        }
+        return $aPriority > $bPriority ? -1 : 1;
+    });
+
+    return $tasks;
+}
 
     /**
      * Get security tasks - REAL DATA

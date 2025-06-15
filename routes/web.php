@@ -55,12 +55,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // Admin staff routes
         Route::get('/staff', [StaffController::class, 'index'])->name('staff.index');
-        Route::get('/staff/create', [StaffController::class, 'create'])->name('staff.create');
-        Route::post('/staff', [StaffController::class, 'store'])->name('staff.store');
-        Route::get('/staff/{staff}', [StaffController::class, 'show'])->name('staff.show');
-        Route::get('/staff/{staff}/edit', [StaffController::class, 'edit'])->name('staff.edit');
-        Route::match(['patch', 'put'], '/staff/{staff}', [StaffController::class, 'update'])->name('staff.update');
-        Route::delete('/staff/{staff}', [StaffController::class, 'destroy'])->name('staff.destroy');
+        Route::get('staff/tasks', [StaffController::class, 'tasks'])->name('staff.tasks');
+        Route::post('staff/tasks', [StaffController::class, 'storeTask'])->name('staff.tasks.store');
+        Route::put('staff/tasks/{task}', [StaffController::class, 'updateTask'])->name('staff.tasks.update');
+        Route::delete('staff/tasks/{task}', [StaffController::class, 'destroyTask'])->name('staff.tasks.destroy');
+        Route::patch('staff/tasks/{task}/status', [StaffController::class, 'updateTaskStatus'])->name('staff.tasks.status');
 
         // NEW: Admin task management routes
         Route::get('/tasks', [StaffController::class, 'tasks'])->name('tasks.index');

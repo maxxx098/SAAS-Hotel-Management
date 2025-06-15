@@ -380,7 +380,8 @@ interface PageProps {
 }
 
 const AdminTaskAssignment: React.FC = () => {
-  const { staff, rooms, tasks, taskTypes, departments } = usePage<PageProps>().props;
+  let { staff, rooms, tasks, taskTypes, departments } = usePage<PageProps>().props;
+  taskTypes = Array.isArray(taskTypes) ? taskTypes : [];
   
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -435,108 +436,156 @@ const AdminTaskAssignment: React.FC = () => {
     management: 'bg-green-100 text-green-800'
   };
 
-  const handleCreateTask = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    try {
-      router.post('/admin/staff/tasks', {
-        ...formData,
-        scheduled_date: formData.scheduled_date ? format(formData.scheduled_date, 'yyyy-MM-dd') : null
-      }, {
-        onSuccess: () => {
-          setIsCreateDialogOpen(false);
-          resetForm();
-          toast({
-            title: "Success",
-            description: "Task created and assigned successfully.",
-          });
-        },
-        onError: (errors) => {
-          toast({
-            title: "Error",
-            description: "Failed to create task. Please check your input.",
-            variant: "destructive",
-          });
-        }
-      });
-    } catch (error) {
-      console.error('Error creating task:', error);
-    }
-  };
-
-  const handleUpdateTask = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!selectedTask) return;
-
-    try {
-      router.put(`/admin/staff/tasks/${selectedTask.id}`, {
-        ...formData,
-        scheduled_date: formData.scheduled_date ? format(formData.scheduled_date, 'yyyy-MM-dd') : null
-      }, {
-        onSuccess: () => {
-          setIsEditDialogOpen(false);
-          setSelectedTask(null);
-          resetForm();
-          toast({
-            title: "Success",
-            description: "Task updated successfully.",
-          });
-        }
-      });
-    } catch (error) {
-      console.error('Error updating task:', error);
-    }
-  };
-
-  const handleDeleteTask = async (taskId: number) => {
-    if (!confirm('Are you sure you want to delete this task?')) return;
-
-    try {
-      router.delete(`/admin/staff/tasks/${taskId}`, {
-        onSuccess: () => {
-          toast({
-            title: "Success",
-            description: "Task deleted successfully.",
-          });
-        }
-      });
-    } catch (error) {
-      console.error('Error deleting task:', error);
-    }
-  };
-
-  const resetForm = () => {
-    setFormData({
-      title: '',
-      description: '',
-      type: '',
-      priority: 'medium',
-      assigned_to: '',
-      room_id: '',
-      scheduled_date: undefined,
-      scheduled_time: '',
-      estimated_duration: 60,
-      location: ''
+const handleCreateTask = async (e: React.FormEvent) => {
+  e.preventDefault();
+  
+  try {
+    router.post(route('admin.staff.tasks.store'), {
+      ...formData,
+      room_id: formData.room_id === 'none' ? null : parseInt(formData.room_id) || null,
+      assigned_to: parseInt(formData.assigned_to),
+      scheduled_date: formData.scheduled_date ? format(formData.scheduled_date, 'yyyy-MM-dd') : null
+    }, {
+      onSuccess: () => {
+        setIsCreateDialogOpen(false);
+        resetForm();
+        toast({
+          title: "Success",
+          description: "Task created and assigned successfully.",
+        });
+      },
+      onError: (errors: any) => {
+        console.log('Validation errors:', errors);
+        toast({
+          title: "Error",
+          description: "Failed to create task. Please check your input.",
+          variant: "destructive",
+        });
+      }
     });
-  };
+  } catch (error) {
+    console.error('Error creating task:', error);
+  }
+};
 
-  const openEditDialog = (task: Task) => {
-    setSelectedTask(task);
-    setFormData({
-      title: task.title,
-      description: task.description,
-      type: task.type,
-      priority: task.priority,
-      assigned_to: task.assigned_to.toString(),
-      room_id: task.room_id?.toString() || '',
-      scheduled_date: new Date(task.scheduled_date),
-      scheduled_time: task.scheduled_time || '',
-      estimated_duration: task.estimated_duration,
-      location: task.location || ''
+// 2. Fix update route
+const handleUpdateTask = async (e: React.FormEvent) => {
+  e.preventDefault();
+  
+  if (!selectedTask) return;
+
+  try {
+    router.put(route('admin.staff.tasks.update', selectedTask.id), { // ✅ Correct
+      ...formData,
+      room_id: formData.room_id === 'none' ? null : parseInt(formData.room_id) || null,
+      assigned_to: parseInt(formData.assigned_to),
+      scheduled_date: formData.scheduled_date ? format(formData.scheduled_date, 'yyyy-MM-dd') : null
+    }, {
+      onSuccess: () => {
+        setIsEditDialogOpen(false);
+        setSelectedTask(null);
+        resetForm();
+        toast({
+          title: "Success",
+          description: "Task updated successfully.",
+        });
+      }
     });
-    setIsEditDialogOpen(true);
-  };
+  } catch (error) {
+    console.error('Error updating task:', error);
+  }
+};
+
+// 3. Fix delete route
+const handleDeleteTask = async (taskId: number) => {
+  if (!confirm('Are you sure you want to delete this task?')) return;
+
+  try {
+    router.delete(route('admin.staff.tasks.destroy', taskId), { // ✅ Correct
+      onSuccess: () => {
+        toast({
+          title: "Success",
+          description: "Task deleted successfully.",
+        });
+      }
+    });
+  } catch (error) {
+    console.error('Error deleting task:', error);
+  }
+};
+
+// 4. Add validation check before submit
+const validateForm = () => {
+  if (!formData.title.trim()) {
+    toast({
+      title: "Validation Error",
+      description: "Task title is required.",
+      variant: "destructive",
+    });
+    return false;
+  }
+  
+  if (!formData.type) {
+    toast({
+      title: "Validation Error", 
+      description: "Task type is required.",
+      variant: "destructive",
+    });
+    return false;
+  }
+  
+  if (!formData.assigned_to) {
+    toast({
+      title: "Validation Error",
+      description: "Please assign the task to a staff member.",
+      variant: "destructive",
+    });
+    return false;
+  }
+  
+  if (!formData.scheduled_date) {
+    toast({
+      title: "Validation Error",
+      description: "Scheduled date is required.",
+      variant: "destructive",
+    });
+    return false;
+  }
+  
+  return true;
+};
+
+const resetForm = () => {
+  setFormData({
+    title: '',
+    description: '',
+    type: '',
+    priority: 'medium',
+    assigned_to: '',
+    room_id: 'none', // Changed from '' to 'none'
+    scheduled_date: undefined,
+    scheduled_time: '',
+    estimated_duration: 60,
+    location: ''
+  });
+};
+
+const openEditDialog = (task: Task) => {
+  setSelectedTask(task);
+  setFormData({
+    title: task.title,
+    description: task.description,
+    type: task.type,
+    priority: task.priority,
+    assigned_to: task.assigned_to.toString(),
+    room_id: task.room_id?.toString() || 'none', // Changed from '' to 'none'
+    scheduled_date: new Date(task.scheduled_date),
+    scheduled_time: task.scheduled_time || '',
+    estimated_duration: task.estimated_duration,
+    location: task.location || ''
+  });
+  setIsEditDialogOpen(true);
+};
 
   const filteredTasks = tasks.filter(task => {
     const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -589,7 +638,7 @@ const AdminTaskAssignment: React.FC = () => {
         </div>
       </div>
 
-      <div className="space-y-2">
+      <div className="col-span-2 space-y-2">
         <Label htmlFor="description">Description</Label>
         <Textarea
           id="description"
@@ -675,22 +724,22 @@ const AdminTaskAssignment: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="room_id">Room (Optional)</Label>
-          <Select value={formData.room_id} onValueChange={(value) => setFormData({ ...formData, room_id: value })}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select room" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">No specific room</SelectItem>
-              {rooms.map((room) => (
-                <SelectItem key={room.id} value={room.id.toString()}>
-                  Room {room.number} ({room.type})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      <div className="space-y-2">
+        <Label htmlFor="room_id">Room (Optional)</Label>
+        <Select value={formData.room_id} onValueChange={(value) => setFormData({ ...formData, room_id: value })}>
+          <SelectTrigger>
+            <SelectValue placeholder="Select room" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">No specific room</SelectItem>
+            {rooms.map((room) => (
+              <SelectItem key={room.id} value={room.id.toString()}>
+                Room {room.number} ({room.type})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
         <div className="space-y-2">
           <Label htmlFor="estimated_duration">Estimated Duration (minutes)</Label>

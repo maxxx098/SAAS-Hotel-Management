@@ -211,14 +211,13 @@ class StaffController extends Controller
     /**
      * Display task assignment page
      */
-    public function tasks(Request $request): Response
-    {
-        $query = StaffTask::with(['assignedStaff:id,name,role,department', 'room:id,number,type'])
-            ->orderBy('scheduled_date', 'asc')
-            ->orderBy('priority', 'desc');
+public function tasks(Request $request): Response
+{
+    $query = StaffTask::with(['assignedTo:id,name,role,department', 'room:id,number,type'])
+        ->orderBy('created_at', 'desc') // Changed from scheduled_date to created_at since scheduled_date doesn't exist
+        ->orderBy('priority', 'desc');
 
-        // Apply filters
-        if ($request->filled('department')) {
+    if ($request->filled('department')) {
             $query->whereHas('assignedStaff', function ($q) use ($request) {
                 $q->where('department', $request->department);
             });
@@ -245,110 +244,102 @@ class StaffController extends Controller
 
         $tasks = $query->get();
 
-        return Inertia::render('dashboard/staff/add', [
-            'tasks' => $tasks,
-            'staff' => User::staff()->select('id', 'name', 'role', 'department', 'employee_id')->get(),
-            'rooms' => Room::select('id', 'number', 'type', 'status')->get(), // Adjust based on your Room model
-            'taskTypes' => $this->getTaskTypes(),
-            'departments' => $this->getDepartments(),
-            'filters' => $request->only(['department', 'status', 'priority', 'search']),
-        ]);
-    }
-
+    return Inertia::render('dashboard/admin/staff/tasks', [
+        'tasks' => $tasks,
+        'staff' => User::staff()->select('id', 'name', 'role', 'department', 'employee_id')->get(),
+        'rooms' => Room::select('id', 'number', 'type', 'status')->get(),
+        'taskTypes' => $this->getTaskTypes(),
+        'departments' => $this->getDepartments(),
+        'filters' => $request->only(['department', 'status', 'priority', 'search']),
+    ]);
+}
     /**
      * Store a new task assignment
      */
     public function storeTask(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'type' => 'required|string|in:' . implode(',', $this->getTaskTypes()),
-            'priority' => 'required|string|in:low,medium,high,urgent',
-            'assigned_to' => 'required|exists:users,id',
-            'room_id' => 'nullable|exists:rooms,id',
-            'scheduled_date' => 'required|date|after_or_equal:today',
-            'scheduled_time' => 'nullable|date_format:H:i',
-            'estimated_duration' => 'required|integer|min:15',
-            'location' => 'nullable|string|max:255',
+{
+    $validator = Validator::make($request->all(), [
+        'title' => 'required|string|max:255',
+        'description' => 'nullable|string',
+        'type' => 'required|string|in:' . implode(',', array_keys(StaffTask::TYPES)), // Use the actual task types from the model
+        'priority' => 'required|string|in:low,medium,high,urgent',
+        'assigned_to' => 'required|exists:users,id',
+        'room_id' => 'nullable|exists:rooms,id',
+        'scheduled_at' => 'nullable|date|after_or_equal:today', // Changed to match model field
+        'estimated_duration' => 'nullable|integer|min:15',
+    ]);
+
+    if ($validator->fails()) {
+        return back()->withErrors($validator)->withInput();
+    }
+
+    try {
+        StaffTask::create([
+            'title' => $request->title,
+            'description' => $request->description,
+            'type' => $request->type,
+            'priority' => $request->priority,
+            'status' => 'pending',
+            'assigned_to' => $request->assigned_to,
+            'room_id' => $request->room_id,
+            'scheduled_at' => $request->scheduled_at,
+            'estimated_duration' => $request->estimated_duration,
+            'created_by' => auth()->id(),
         ]);
 
-        if ($validator->fails()) {
-            return back()->withErrors($validator)->withInput();
-        }
+        return back()->with('success', 'Task assigned successfully.');
 
-        try {
-            Task::create([
-                'title' => $request->title,
-                'description' => $request->description,
-                'type' => $request->type,
-                'priority' => $request->priority,
-                'status' => 'pending',
-                'assigned_to' => $request->assigned_to,
-                'room_id' => $request->room_id,
-                'scheduled_date' => $request->scheduled_date,
-                'scheduled_time' => $request->scheduled_time,
-                'estimated_duration' => $request->estimated_duration,
-                'location' => $request->location,
-                'created_by' => auth()->id(),
-            ]);
-
-            return back()->with('success', 'Task assigned successfully.');
-
-        } catch (\Exception $e) {
-            return back()->withErrors(['error' => 'Failed to assign task. Please try again.']);
-        }
+    } catch (\Exception $e) {
+        return back()->withErrors(['error' => 'Failed to assign task. Please try again.']);
     }
+}
+
 
     /**
      * Update an existing task
      */
-    public function updateTask(Request $request, Task $task)
-    {
-        $validator = Validator::make($request->all(), [
-            'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'type' => 'required|string|in:' . implode(',', $this->getTaskTypes()),
-            'priority' => 'required|string|in:low,medium,high,urgent',
-            'assigned_to' => 'required|exists:users,id',
-            'room_id' => 'nullable|exists:rooms,id',
-            'scheduled_date' => 'required|date',
-            'scheduled_time' => 'nullable|date_format:H:i',
-            'estimated_duration' => 'required|integer|min:15',
-            'location' => 'nullable|string|max:255',
-            'status' => 'nullable|string|in:pending,in_progress,completed,cancelled',
+   public function updateTask(Request $request, StaffTask $task)
+{
+    $validator = Validator::make($request->all(), [
+        'title' => 'required|string|max:255',
+        'description' => 'nullable|string',
+        'type' => 'required|string|in:' . implode(',', array_keys(StaffTask::TYPES)),
+        'priority' => 'required|string|in:low,medium,high,urgent',
+        'assigned_to' => 'required|exists:users,id',
+        'room_id' => 'nullable|exists:rooms,id',
+        'scheduled_at' => 'nullable|date',
+        'estimated_duration' => 'nullable|integer|min:15',
+        'status' => 'nullable|string|in:pending,in_progress,completed,cancelled',
+    ]);
+
+    if ($validator->fails()) {
+        return back()->withErrors($validator)->withInput();
+    }
+
+    try {
+        $task->update([
+            'title' => $request->title,
+            'description' => $request->description,
+            'type' => $request->type,
+            'priority' => $request->priority,
+            'status' => $request->status ?? $task->status,
+            'assigned_to' => $request->assigned_to,
+            'room_id' => $request->room_id,
+            'scheduled_at' => $request->scheduled_at,
+            'estimated_duration' => $request->estimated_duration,
         ]);
 
-        if ($validator->fails()) {
-            return back()->withErrors($validator)->withInput();
-        }
+        return back()->with('success', 'Task updated successfully.');
 
-        try {
-            $task->update([
-                'title' => $request->title,
-                'description' => $request->description,
-                'type' => $request->type,
-                'priority' => $request->priority,
-                'status' => $request->status ?? $task->status,
-                'assigned_to' => $request->assigned_to,
-                'room_id' => $request->room_id,
-                'scheduled_date' => $request->scheduled_date,
-                'scheduled_time' => $request->scheduled_time,
-                'estimated_duration' => $request->estimated_duration,
-                'location' => $request->location,
-            ]);
-
-            return back()->with('success', 'Task updated successfully.');
-
-        } catch (\Exception $e) {
-            return back()->withErrors(['error' => 'Failed to update task. Please try again.']);
-        }
+    } catch (\Exception $e) {
+        return back()->withErrors(['error' => 'Failed to update task. Please try again.']);
     }
+}
 
     /**
      * Delete a task
      */
-    public function destroyTask(Task $task)
+    public function destroyTask(StaffTask $task)
     {
         try {
             $task->delete();
@@ -361,7 +352,7 @@ class StaffController extends Controller
     /**
      * Update task status (for staff to update their own tasks)
      */
-    public function updateTaskStatus(Request $request, Task $task)
+    public function updateTaskStatus(Request $request, StaffTask $task)
     {
         $request->validate([
             'status' => 'required|string|in:pending,in_progress,completed,cancelled',
