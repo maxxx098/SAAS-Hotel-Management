@@ -173,75 +173,93 @@ class StaffDashboardController extends Controller
      * Update task status.
      */
     public function updateTaskStatus(Request $request): JsonResponse
-    {
-        try {
-            $request->validate([
-                'task_id' => 'required|integer',
-                'status' => 'required|string|in:pending,in_progress,completed',
-                'task_type' => 'required|string|in:room_cleaning,maintenance,check_in,check_out,guest_service,general',
-            ]);
+{
+    try {
+        $request->validate([
+            'task_id' => 'required|integer',
+            'status' => 'required|string|in:pending,in_progress,completed',
+            'task_type' => 'required|string|in:room_cleaning,maintenance,maintenance_request,staff_task,check_in,check_out,guest_service,general',
+        ]);
 
-            $user = auth()->user();
-            $taskType = $request->task_type;
-            $taskId = $request->task_id;
-            $status = $request->status;
+        $user = auth()->user();
+        $taskType = $request->task_type;
+        $taskId = $request->task_id;
+        $status = $request->status;
 
-            switch ($taskType) {
-                case 'room_cleaning':
-                    $this->updateRoomCleaningStatus($taskId, $status, $user->id);
-                    break;
+        switch ($taskType) {
+            case 'room_cleaning':
+                $this->updateRoomCleaningStatus($taskId, $status, $user->id);
+                break;
+                
+            case 'maintenance_request':
+                MaintenanceRequest::where('id', $taskId)
+                    ->where('assigned_to', $user->id)
+                    ->update([
+                        'status' => $status,
+                        'completed_at' => $status === 'completed' ? now() : null,
+                        'started_at' => $status === 'in_progress' && !MaintenanceRequest::find($taskId)->started_at ? now() : MaintenanceRequest::find($taskId)->started_at,
+                        'updated_at' => now(),
+                    ]);
+                break;
+                
+            case 'staff_task':
+            case 'maintenance':
+                StaffTask::where('id', $taskId)
+                    ->where('assigned_to', $user->id)
+                    ->update([
+                        'status' => $status,
+                        'completed_at' => $status === 'completed' ? now() : null,
+                        'updated_at' => now(),
+                    ]);
+                break;
                     
-                case 'maintenance':
-                    MaintenanceRequest::where('id', $taskId)
-                        ->where('assigned_to', $user->id)
-                        ->update([
-                            'status' => $status,
-                            'updated_at' => now(),
-                        ]);
-                    break;
-                    
-                case 'check_in':
-                case 'check_out':
-                    $this->updateBookingStatus($taskId, $status, $taskType);
-                    break;
-                    
-                case 'general':
-                case 'guest_service':
-                    StaffTask::where('id', $taskId)
-                        ->where('assigned_to', $user->id)
-                        ->update([
-                            'status' => $status,
-                            'completed_at' => $status === 'completed' ? now() : null,
-                            'updated_at' => now(),
-                        ]);
-                    break;
-            }
-
-            // Log the activity
-            $user->logActivity(
-                'task_' . $status,
-                ucfirst($status) . ' task',
-                "Task #{$taskId} status updated to {$status}",
-                ['task_id' => $taskId, 'task_type' => $taskType, 'status' => $status]
-            );
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Task status updated successfully',
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Failed to update task status', [
-                'error' => $e->getMessage(),
-                'user_id' => auth()->id(),
-                'request_data' => $request->all(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to update task status',
-            ], 500);
+            case 'check_in':
+            case 'check_out':
+                $this->updateBookingStatus($taskId, $status, $taskType);
+                break;
+                
+            case 'general':
+            case 'guest_service':
+                StaffTask::where('id', $taskId)
+                    ->where('assigned_to', $user->id)
+                    ->update([
+                        'status' => $status,
+                        'completed_at' => $status === 'completed' ? now() : null,
+                        'updated_at' => now(),
+                    ]);
+                break;
         }
+
+        // Log the activity
+        ActivityLog::create([
+            'user_id' => $user->id,
+            'type' => 'task_' . $status,
+            'title' => ucfirst($status) . ' task',
+            'description' => "Task #{$taskId} status updated to {$status}",
+            'properties' => json_encode([
+                'task_id' => $taskId, 
+                'task_type' => $taskType, 
+                'status' => $status
+            ]),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Task status updated successfully',
+        ]);
+    } catch (\Exception $e) {
+        Log::error('Failed to update task status', [
+            'error' => $e->getMessage(),
+            'user_id' => auth()->id(),
+            'request_data' => $request->all(),
+        ]);
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to update task status',
+        ], 500);
     }
+}
 
     /**
      * Get staff dashboard data.
