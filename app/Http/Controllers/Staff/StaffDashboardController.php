@@ -24,42 +24,53 @@ class StaffDashboardController extends Controller
     /**
      * Display the staff dashboard.
      */
-    public function index(): Response
-    {
-        try {
-            $user = auth()->user();
-            $dashboardData = $this->getStaffDashboardData($user);
+public function index(): Response
+{
+    try {
+        $user = auth()->user();
+        $dashboardData = $this->getStaffDashboardData($user);
 
-            return Inertia::render('dashboard/staff/index', [
-                'dashboardData' => $dashboardData,
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'phone' => $user->phone ?? null,
-                    'role' => $user->role,
-                    'department' => $user->department ?? $this->getDepartmentFromRole($user->role),
-                    'employee_id' => $user->employee_id ?? $this->generateEmployeeId($user->id),
-                    'hire_date' => $user->hire_date ? $user->hire_date->format('Y-m-d') : $user->created_at->format('Y-m-d'),
-                ],
-                'userRole' => $user->role ?? 'staff',
-                'isStaff' => true,
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Staff dashboard data fetch error', [
-                'error' => $e->getMessage(),
-                'user_id' => auth()->id(),
-            ]);
+        return Inertia::render('dashboard/staff/index', [
+            'dashboardData' => $dashboardData,
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'phone' => $user->phone ?? null,
+                'role' => $user->role,
+                'department' => $user->department ?? $this->getDepartmentFromRole($user->role),
+                'employee_id' => $user->employee_id ?? $this->generateEmployeeId($user->id),
+                'hire_date' => $user->hire_date ? $user->hire_date->format('Y-m-d') : $user->created_at->format('Y-m-d'),
+            ],
+            'userRole' => $user->role ?? 'staff',
+            'isStaff' => true,
+        ]);
+    } catch (\Exception $e) {
+        Log::error('Staff dashboard data fetch error', [
+            'error' => $e->getMessage(),
+            'user_id' => auth()->id(),
+        ]);
 
-            return Inertia::render('dashboard/staff/index', [
-                'dashboardData' => $this->getEmptyStaffDashboardData(),
-                'user' => auth()->user(),
-                'userRole' => auth()->user()->role ?? 'staff',
-                'isStaff' => true,
-                'error' => 'Failed to load dashboard data',
-            ]);
-        }
+        $user = auth()->user(); // Add this line
+
+        return Inertia::render('dashboard/staff/index', [
+            'dashboardData' => $this->getEmptyStaffDashboardData(),
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'phone' => $user->phone ?? null,
+                'role' => $user->role,
+                'department' => $user->department ?? $this->getDepartmentFromRole($user->role),
+                'employee_id' => $user->employee_id ?? $this->generateEmployeeId($user->id),
+                'hire_date' => $user->hire_date ? $user->hire_date->format('Y-m-d') : $user->created_at->format('Y-m-d'),
+            ],
+            'userRole' => $user->role ?? 'staff',
+            'isStaff' => true,
+            'error' => 'Failed to load dashboard data. Please refresh the page.',
+        ]);
     }
+}
 
     /**
      * Get staff dashboard statistics.
@@ -173,93 +184,93 @@ class StaffDashboardController extends Controller
      * Update task status.
      */
     public function updateTaskStatus(Request $request): JsonResponse
-{
-    try {
-        $request->validate([
-            'task_id' => 'required|integer',
-            'status' => 'required|string|in:pending,in_progress,completed',
-            'task_type' => 'required|string|in:room_cleaning,maintenance,maintenance_request,staff_task,check_in,check_out,guest_service,general',
-        ]);
+    {
+        try {
+            $request->validate([
+                'task_id' => 'required|integer',
+                'status' => 'required|string|in:pending,in_progress,completed',
+                'task_type' => 'required|string|in:room_cleaning,maintenance,maintenance_request,staff_task,check_in,check_out,guest_service,general',
+            ]);
 
-        $user = auth()->user();
-        $taskType = $request->task_type;
-        $taskId = $request->task_id;
-        $status = $request->status;
+            $user = auth()->user();
+            $taskType = $request->task_type;
+            $taskId = $request->task_id;
+            $status = $request->status;
 
-        switch ($taskType) {
-            case 'room_cleaning':
-                $this->updateRoomCleaningStatus($taskId, $status, $user->id);
-                break;
-                
-            case 'maintenance_request':
-                MaintenanceRequest::where('id', $taskId)
-                    ->where('assigned_to', $user->id)
-                    ->update([
-                        'status' => $status,
-                        'completed_at' => $status === 'completed' ? now() : null,
-                        'started_at' => $status === 'in_progress' && !MaintenanceRequest::find($taskId)->started_at ? now() : MaintenanceRequest::find($taskId)->started_at,
-                        'updated_at' => now(),
-                    ]);
-                break;
-                
-            case 'staff_task':
-            case 'maintenance':
-                StaffTask::where('id', $taskId)
-                    ->where('assigned_to', $user->id)
-                    ->update([
-                        'status' => $status,
-                        'completed_at' => $status === 'completed' ? now() : null,
-                        'updated_at' => now(),
-                    ]);
-                break;
+            switch ($taskType) {
+                case 'room_cleaning':
+                    $this->updateRoomCleaningStatus($taskId, $status, $user->id);
+                    break;
                     
-            case 'check_in':
-            case 'check_out':
-                $this->updateBookingStatus($taskId, $status, $taskType);
-                break;
-                
-            case 'general':
-            case 'guest_service':
-                StaffTask::where('id', $taskId)
-                    ->where('assigned_to', $user->id)
-                    ->update([
-                        'status' => $status,
-                        'completed_at' => $status === 'completed' ? now() : null,
-                        'updated_at' => now(),
-                    ]);
-                break;
+                case 'maintenance_request':
+                    MaintenanceRequest::where('id', $taskId)
+                        ->where('assigned_to', $user->id)
+                        ->update([
+                            'status' => $status,
+                            'completed_at' => $status === 'completed' ? now() : null,
+                            'started_at' => $status === 'in_progress' && !MaintenanceRequest::find($taskId)->started_at ? now() : MaintenanceRequest::find($taskId)->started_at,
+                            'updated_at' => now(),
+                        ]);
+                    break;
+                    
+                case 'staff_task':
+                case 'maintenance':
+                    StaffTask::where('id', $taskId)
+                        ->where('assigned_to', $user->id)
+                        ->update([
+                            'status' => $status,
+                            'completed_at' => $status === 'completed' ? now() : null,
+                            'updated_at' => now(),
+                        ]);
+                    break;
+                        
+                case 'check_in':
+                case 'check_out':
+                    $this->updateBookingStatus($taskId, $status, $taskType);
+                    break;
+                    
+                case 'general':
+                case 'guest_service':
+                    StaffTask::where('id', $taskId)
+                        ->where('assigned_to', $user->id)
+                        ->update([
+                            'status' => $status,
+                            'completed_at' => $status === 'completed' ? now() : null,
+                            'updated_at' => now(),
+                        ]);
+                    break;
+            }
+
+            // Log the activity
+            ActivityLog::create([
+                'user_id' => $user->id,
+                'type' => 'task_' . $status,
+                'title' => ucfirst($status) . ' task',
+                'description' => "Task #{$taskId} status updated to {$status}",
+                'properties' => json_encode([
+                    'task_id' => $taskId, 
+                    'task_type' => $taskType, 
+                    'status' => $status
+                ]),
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Task status updated successfully',
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to update task status', [
+                'error' => $e->getMessage(),
+                'user_id' => auth()->id(),
+                'request_data' => $request->all(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update task status',
+            ], 500);
         }
-
-        // Log the activity
-        ActivityLog::create([
-            'user_id' => $user->id,
-            'type' => 'task_' . $status,
-            'title' => ucfirst($status) . ' task',
-            'description' => "Task #{$taskId} status updated to {$status}",
-            'properties' => json_encode([
-                'task_id' => $taskId, 
-                'task_type' => $taskType, 
-                'status' => $status
-            ]),
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Task status updated successfully',
-        ]);
-    } catch (\Exception $e) {
-        Log::error('Failed to update task status', [
-            'error' => $e->getMessage(),
-            'user_id' => auth()->id(),
-            'request_data' => $request->all(),
-        ]);
-
-        return response()->json([
-            'success' => false,
-            'message' => 'Failed to update task status',
-        ], 500);
     }
-}
 
     /**
      * Get staff dashboard data.
@@ -287,33 +298,39 @@ class StaffDashboardController extends Controller
     /**
      * Get today's staff statistics.
      */
-    private function getTodayStaffStats($user): array
-    {
-        try {
-            $today = Carbon::today();
-            $role = $user->role ?? 'staff';
+   private function getTodayStaffStats($user): array
+{
+    try {
+        $today = Carbon::today();
+        $role = $user->role ?? 'staff';
 
-            switch ($role) {
-                case 'front_desk':
-                    return $this->getFrontDeskStats($user, $today);
-                    
-                case 'housekeeping':
-                    return $this->getHousekeepingStats($user, $today);
-                    
-                case 'maintenance':
-                    return $this->getMaintenanceStats($user, $today);
-                    
-                case 'security':
-                    return $this->getSecurityStats($user, $today);
-                    
-                default:
-                    return $this->getGeneralStaffStats($user, $today);
-            }
-        } catch (\Exception $e) {
-            Log::error('Error getting staff stats', ['error' => $e->getMessage(), 'user_id' => $user->id]);
-            return $this->getEmptyStaffStats();
+        switch ($role) {
+            case 'front_desk':
+                return $this->getFrontDeskStats($user, $today);
+                
+            case 'housekeeping':
+                return $this->getHousekeepingStats($user, $today);
+                
+            case 'maintenance':
+                return $this->getMaintenanceStats($user, $today);
+                
+            case 'security':
+                return $this->getSecurityStats($user, $today);
+                
+            case 'staff':
+            case 'general_staff':
+            default:
+                return $this->getGeneralStaffStats($user, $today);
         }
+    } catch (\Exception $e) {
+        Log::error('Error getting staff stats', [
+            'error' => $e->getMessage(), 
+            'user_id' => $user->id,
+            'role' => $user->role
+        ]);
+        return $this->getEmptyStaffStats();
     }
+}
 
     /**
      * Get front desk statistics - REAL DATA
@@ -426,83 +443,133 @@ class StaffDashboardController extends Controller
     /**
      * Get security statistics - REAL DATA
      */
-    private function getSecurityStats($user, $today): array
+     private function getSecurityStats($user, $today): array
     {
-        $incidentsToday = ActivityLog::where('user_id', $user->id)
-            ->where('type', 'incident')
-            ->whereDate('created_at', $today)
-            ->count();
+        try {
+            // Use null coalescing and proper error handling
+            $incidentsToday = ActivityLog::where('user_id', $user->id)
+                ->where('type', 'incident')
+                ->whereDate('created_at', $today)
+                ->count() ?? 0;
 
-        $patrolsCompleted = StaffTask::where('assigned_to', $user->id)
-            ->where('type', 'patrol')
-            ->where('status', 'completed')
-            ->whereDate('completed_at', $today)
-            ->count();
+            $patrolsCompleted = StaffTask::where('assigned_to', $user->id)
+                ->where('type', 'patrol')
+                ->where('status', 'completed')
+                ->whereDate('completed_at', $today)
+                ->count() ?? 0;
 
-        $guestAssistance = ActivityLog::where('user_id', $user->id)
-            ->where('type', 'guest_assistance')
-            ->whereDate('created_at', $today)
-            ->count();
+            $guestAssistance = ActivityLog::where('user_id', $user->id)
+                ->where('type', 'guest_assistance')
+                ->whereDate('created_at', $today)
+                ->count() ?? 0;
 
-        $keyCardIssues = MaintenanceRequest::where('assigned_to', $user->id)
-            ->where('type', 'keycard')
-            ->whereDate('created_at', $today)
-            ->count();
+            // Check if MaintenanceRequest table has the columns we need
+            $keyCardIssues = 0;
+            try {
+                $keyCardIssues = MaintenanceRequest::where('assigned_to', $user->id)
+                    ->where('type', 'keycard')
+                    ->whereDate('created_at', $today)
+                    ->count() ?? 0;
+            } catch (\Exception $e) {
+                // If keycard type doesn't exist, try different approach
+                $keyCardIssues = MaintenanceRequest::where('assigned_to', $user->id)
+                    ->where(function($query) {
+                        $query->where('title', 'LIKE', '%keycard%')
+                              ->orWhere('title', 'LIKE', '%key card%')
+                              ->orWhere('description', 'LIKE', '%keycard%');
+                    })
+                    ->whereDate('created_at', $today)
+                    ->count() ?? 0;
+            }
 
-        $tasksCompleted = $this->getCompletedTasksCount($user->id, $today);
+            $tasksCompleted = $this->getCompletedTasksCount($user->id, $today);
 
-        $currentSchedule = StaffSchedule::where('staff_id', $user->id)
-            ->whereDate('date', $today)
-            ->first();
+            // Get current schedule with better error handling
+            $currentSchedule = null;
+            try {
+                $currentSchedule = StaffSchedule::where('staff_id', $user->id)
+                    ->whereDate('date', $today)
+                    ->first();
+            } catch (\Exception $e) {
+                Log::warning('StaffSchedule table might not exist', ['error' => $e->getMessage()]);
+            }
 
-        $shiftStatus = $this->determineShiftStatus($currentSchedule);
+            $shiftStatus = $this->determineShiftStatus($currentSchedule);
 
-        return [
-            'incidentsToday' => $incidentsToday,
-            'patrolsCompleted' => $patrolsCompleted,
-            'guestAssistance' => $guestAssistance,
-            'keyCardIssues' => $keyCardIssues,
-            'tasksCompleted' => $tasksCompleted,
-            'shiftStatus' => $shiftStatus,
-        ];
+            return [
+                'incidentsToday' => $incidentsToday,
+                'patrolsCompleted' => $patrolsCompleted,
+                'guestAssistance' => $guestAssistance,
+                'keyCardIssues' => $keyCardIssues,
+                'tasksCompleted' => $tasksCompleted,
+                'shiftStatus' => $shiftStatus,
+            ];
+        } catch (\Exception $e) {
+            Log::error('Error in getSecurityStats', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'user_id' => $user->id
+            ]);
+            return $this->getEmptySecurityStats();
+        }
     }
 
     /**
      * Get general staff statistics - REAL DATA
      */
-    private function getGeneralStaffStats($user, $today): array
+  private function getGeneralStaffStats($user, $today): array
     {
-        $tasksAssigned = StaffTask::where('assigned_to', $user->id)
-            ->whereDate('scheduled_date', $today)
-            ->count();
+        try {
+            $tasksAssigned = StaffTask::where('assigned_to', $user->id)
+                ->whereDate('scheduled_date', $today)
+                ->count() ?? 0;
 
-        $tasksCompleted = $this->getCompletedTasksCount($user->id, $today);
+            $tasksCompleted = $this->getCompletedTasksCount($user->id, $today);
 
-        $tasksPending = StaffTask::where('assigned_to', $user->id)
-            ->whereDate('scheduled_date', $today)
-            ->where('status', 'pending')
-            ->count();
+            $tasksPending = StaffTask::where('assigned_to', $user->id)
+                ->whereDate('scheduled_date', $today)
+                ->where('status', 'pending')
+                ->count() ?? 0;
 
-        $hoursWorked = $this->calculateHoursWorked($user, $today);
+            $hoursWorked = 0;
+            try {
+                $hoursWorked = $this->calculateHoursWorked($user, $today);
+            } catch (\Exception $e) {
+                Log::warning('Error calculating hours worked', ['error' => $e->getMessage()]);
+                $hoursWorked = 0;
+            }
 
-        $currentSchedule = StaffSchedule::where('staff_id', $user->id)
-            ->whereDate('date', $today)
-            ->first();
+            // Get current schedule with better error handling
+            $currentSchedule = null;
+            try {
+                $currentSchedule = StaffSchedule::where('staff_id', $user->id)
+                    ->whereDate('date', $today)
+                    ->first();
+            } catch (\Exception $e) {
+                Log::warning('StaffSchedule table might not exist', ['error' => $e->getMessage()]);
+            }
 
-        $shiftStatus = $this->determineShiftStatus($currentSchedule);
+            $shiftStatus = $this->determineShiftStatus($currentSchedule);
 
-        $performance = $tasksAssigned > 0 ? round(($tasksCompleted / $tasksAssigned) * 100) : 0;
+            $performance = $tasksAssigned > 0 ? round(($tasksCompleted / $tasksAssigned) * 100) : 0;
 
-        return [
-            'tasksAssigned' => $tasksAssigned,
-            'tasksCompleted' => $tasksCompleted,
-            'tasksPending' => $tasksPending,
-            'hoursWorked' => $hoursWorked,
-            'shiftStatus' => $shiftStatus,
-            'performance' => $performance,
-        ];
+            return [
+                'tasksAssigned' => $tasksAssigned,
+                'tasksCompleted' => $tasksCompleted,
+                'tasksPending' => $tasksPending,
+                'hoursWorked' => $hoursWorked,
+                'shiftStatus' => $shiftStatus,
+                'performance' => $performance,
+            ];
+        } catch (\Exception $e) {
+            Log::error('Error in getGeneralStaffStats', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'user_id' => $user->id
+            ]);
+            return $this->getEmptyGeneralStats();
+        }
     }
-
     /**
      * Get today's tasks for staff - REAL DATA
      */
@@ -668,72 +735,72 @@ class StaffDashboardController extends Controller
      * Get maintenance tasks - REAL DATA
      */
     private function getMaintenanceTasks($user, $today): array
-{
-    $tasks = [];
+    {
+        $tasks = [];
 
-    // Get StaffTask records for maintenance staff (from admin assignments)
-    $staffTasks = StaffTask::with(['room'])
-        ->where('assigned_to', $user->id)
-        ->whereIn('status', ['pending', 'in_progress'])
-        ->orderBy('priority', 'desc')
-        ->orderBy('created_at', 'asc')
-        ->limit(10)
-        ->get();
+        // Get StaffTask records for maintenance staff (from admin assignments)
+        $staffTasks = StaffTask::with(['room'])
+            ->where('assigned_to', $user->id)
+            ->whereIn('status', ['pending', 'in_progress'])
+            ->orderBy('priority', 'desc')
+            ->orderBy('created_at', 'asc')
+            ->limit(10)
+            ->get();
 
-    foreach ($staffTasks as $task) {
-        $tasks[] = [
-            'id' => $task->id,
-            'type' => 'staff_task', // Distinguish from maintenance requests
-            'title' => $task->title,
-            'description' => $task->description ?? 'No description',
-            'time' => $task->scheduled_at ? Carbon::parse($task->scheduled_at)->format('H:i') : 'TBD',
-            'priority' => $task->priority ?? 'medium',
-            'status' => $task->status ?? 'pending',
-            'room_number' => $task->room->number ?? 'N/A',
-            'estimated_duration' => $task->estimated_duration ?? 60,
-            'task_type' => $task->type,
-        ];
-    }
-
-    // Also get actual MaintenanceRequest records (if you have them)
-    $maintenanceRequests = MaintenanceRequest::with(['room', 'reportedBy'])
-        ->where('assigned_to', $user->id)
-        ->whereIn('status', ['pending', 'in_progress'])
-        ->orderBy('priority', 'desc')
-        ->orderBy('created_at', 'asc')
-        ->limit(10)
-        ->get();
-
-    foreach ($maintenanceRequests as $request) {
-        $tasks[] = [
-            'id' => $request->id,
-            'type' => 'maintenance_request', // Distinguish from staff tasks
-            'title' => $request->title ?? 'Maintenance Request',
-            'description' => $request->description ?? 'No description',
-            'time' => $request->created_at->format('H:i'),
-            'priority' => $request->priority ?? 'medium',
-            'status' => $request->status ?? 'pending',
-            'room_number' => $request->room->number ?? 'N/A',
-            'location' => $request->location ?? 'Room',
-            'reported_by' => $request->reportedBy->name ?? 'System',
-            'estimated_duration' => $request->estimated_duration ?? 60,
-        ];
-    }
-
-    // Sort all tasks by priority and creation time
-    usort($tasks, function($a, $b) {
-        $priorityOrder = ['urgent' => 4, 'high' => 3, 'medium' => 2, 'low' => 1];
-        $aPriority = $priorityOrder[$a['priority']] ?? 1;
-        $bPriority = $priorityOrder[$b['priority']] ?? 1;
-        
-        if ($aPriority === $bPriority) {
-            return 0;
+        foreach ($staffTasks as $task) {
+            $tasks[] = [
+                'id' => $task->id,
+                'type' => 'staff_task', // Distinguish from maintenance requests
+                'title' => $task->title,
+                'description' => $task->description ?? 'No description',
+                'time' => $task->scheduled_at ? Carbon::parse($task->scheduled_at)->format('H:i') : 'TBD',
+                'priority' => $task->priority ?? 'medium',
+                'status' => $task->status ?? 'pending',
+                'room_number' => $task->room->number ?? 'N/A',
+                'estimated_duration' => $task->estimated_duration ?? 60,
+                'task_type' => $task->type,
+            ];
         }
-        return $aPriority > $bPriority ? -1 : 1;
-    });
 
-    return $tasks;
-}
+        // Also get actual MaintenanceRequest records (if you have them)
+        $maintenanceRequests = MaintenanceRequest::with(['room', 'reportedBy'])
+            ->where('assigned_to', $user->id)
+            ->whereIn('status', ['pending', 'in_progress'])
+            ->orderBy('priority', 'desc')
+            ->orderBy('created_at', 'asc')
+            ->limit(10)
+            ->get();
+
+        foreach ($maintenanceRequests as $request) {
+            $tasks[] = [
+                'id' => $request->id,
+                'type' => 'maintenance_request', // Distinguish from staff tasks
+                'title' => $request->title ?? 'Maintenance Request',
+                'description' => $request->description ?? 'No description',
+                'time' => $request->created_at->format('H:i'),
+                'priority' => $request->priority ?? 'medium',
+                'status' => $request->status ?? 'pending',
+                'room_number' => $request->room->number ?? 'N/A',
+                'location' => $request->location ?? 'Room',
+                'reported_by' => $request->reportedBy->name ?? 'System',
+                'estimated_duration' => $request->estimated_duration ?? 60,
+            ];
+        }
+
+        // Sort all tasks by priority and creation time
+        usort($tasks, function($a, $b) {
+            $priorityOrder = ['urgent' => 4, 'high' => 3, 'medium' => 2, 'low' => 1];
+            $aPriority = $priorityOrder[$a['priority']] ?? 1;
+            $bPriority = $priorityOrder[$b['priority']] ?? 1;
+            
+            if ($aPriority === $bPriority) {
+                return 0;
+            }
+            return $aPriority > $bPriority ? -1 : 1;
+        });
+
+        return $tasks;
+    }
 
     /**
      * Get security tasks - REAL DATA
@@ -742,13 +809,58 @@ class StaffDashboardController extends Controller
     {
         $tasks = [];
 
-        $securityTasks = StaffTask::where('assigned_to', $user->id)
+        // Get scheduled patrols
+        $patrols = StaffTask::where('assigned_to', $user->id)
+            ->where('type', 'patrol')
             ->whereDate('scheduled_date', $today)
             ->where('status', '!=', 'completed')
-            ->orderBy('scheduled_time')
             ->get();
 
-        foreach ($securityTasks as $task) {
+        foreach ($patrols as $patrol) {
+            $tasks[] = [
+                'id' => $patrol->id,
+                'type' => 'patrol',
+                'title' => $patrol->title ?? 'Security Patrol',
+                'description' => $patrol->description ?? 'Routine security patrol',
+                'time' => $patrol->scheduled_time ? Carbon::parse($patrol->scheduled_time)->format('H:i') : 'TBD',
+                'priority' => $patrol->priority ?? 'medium',
+                'status' => $patrol->status,
+                'location' => $patrol->location ?? 'Property grounds',
+                'estimated_duration' => $patrol->estimated_duration ?? 30,
+            ];
+        }
+
+        // Get security-related maintenance requests
+        $securityRequests = MaintenanceRequest::with(['room', 'reportedBy'])
+            ->where('assigned_to', $user->id)
+            ->whereIn('type', ['security', 'keycard', 'access_control'])
+            ->whereIn('status', ['pending', 'in_progress'])
+            ->get();
+
+      foreach ($securityRequests as $request) {
+            $tasks[] = [
+                'id' => $request->id,
+                'type' => 'security_request',
+                'title' => $request->title ?? 'Security Issue',
+                'description' => $request->description ?? 'Security-related maintenance',
+                'time' => $request->created_at->format('H:i'),
+                'priority' => $request->priority ?? 'high',
+                'status' => $request->status,
+                'room_number' => $request->room->number ?? 'N/A',
+                'location' => $request->location ?? 'Various',
+                'reported_by' => $request->reportedBy->name ?? 'System',
+                'estimated_duration' => $request->estimated_duration ?? 45,
+            ];
+        }
+
+        // Get general security tasks
+        $generalTasks = StaffTask::where('assigned_to', $user->id)
+            ->whereDate('scheduled_date', $today)
+            ->where('type', '!=', 'patrol')
+            ->where('status', '!=', 'completed')
+            ->get();
+
+        foreach ($generalTasks as $task) {
             $tasks[] = [
                 'id' => $task->id,
                 'type' => $task->type,
@@ -757,7 +869,6 @@ class StaffDashboardController extends Controller
                 'time' => $task->scheduled_time ? Carbon::parse($task->scheduled_time)->format('H:i') : 'TBD',
                 'priority' => $task->priority,
                 'status' => $task->status,
-                'location' => $task->location ?? 'Various',
                 'estimated_duration' => $task->estimated_duration,
             ];
         }
@@ -772,15 +883,14 @@ class StaffDashboardController extends Controller
     {
         $tasks = [];
 
-        $staffTasks = StaffTask::with(['room', 'booking'])
+        $generalTasks = StaffTask::with(['room', 'booking'])
             ->where('assigned_to', $user->id)
             ->whereDate('scheduled_date', $today)
             ->where('status', '!=', 'completed')
             ->orderBy('priority', 'desc')
-            ->orderBy('scheduled_time')
             ->get();
 
-        foreach ($staffTasks as $task) {
+        foreach ($generalTasks as $task) {
             $tasks[] = [
                 'id' => $task->id,
                 'type' => $task->type,
@@ -789,8 +899,8 @@ class StaffDashboardController extends Controller
                 'time' => $task->scheduled_time ? Carbon::parse($task->scheduled_time)->format('H:i') : 'TBD',
                 'priority' => $task->priority,
                 'status' => $task->status,
+                'room_number' => $task->room->number ?? null,
                 'estimated_duration' => $task->estimated_duration,
-                'location' => $task->location,
             ];
         }
 
@@ -806,23 +916,24 @@ class StaffDashboardController extends Controller
             return [];
         }
 
-        $assignments = RoomAssignment::with('room')
+        $today = Carbon::today();
+        
+        $assignments = RoomAssignment::with(['room'])
             ->where('staff_id', $user->id)
-            ->whereDate('date', today())
-            ->where('status', '!=', 'completed')
+            ->whereDate('date', $today)
+            ->orderBy('scheduled_time')
             ->get();
 
         return $assignments->map(function ($assignment) {
             return [
-                'id' => $assignment->room->id,
-                'assignment_id' => $assignment->id,
-                'number' => $assignment->room->number,
-                'type' => $assignment->room->type,
+                'id' => $assignment->id,
+                'room_number' => $assignment->room->number,
+                'room_type' => $assignment->room->type,
                 'status' => $assignment->status,
                 'cleaning_type' => $assignment->cleaning_type,
-                'scheduled_time' => $assignment->scheduled_time,
                 'priority' => $assignment->priority,
-                'estimated_time' => $assignment->estimated_duration ?? 45,
+                'scheduled_time' => $assignment->scheduled_time ? Carbon::parse($assignment->scheduled_time)->format('H:i') : null,
+                'estimated_duration' => $assignment->estimated_duration ?? 45,
                 'notes' => $assignment->notes,
             ];
         })->toArray();
@@ -833,31 +944,27 @@ class StaffDashboardController extends Controller
      */
     private function getMaintenanceRequestsData($user): array
     {
-        if ($user->role !== 'maintenance') {
-            return [];
-        }
-
         $requests = MaintenanceRequest::with(['room', 'reportedBy'])
             ->where('assigned_to', $user->id)
             ->whereIn('status', ['pending', 'in_progress'])
             ->orderBy('priority', 'desc')
             ->orderBy('created_at', 'asc')
-            ->limit(15)
+            ->limit(10)
             ->get();
 
         return $requests->map(function ($request) {
             return [
                 'id' => $request->id,
-                'title' => $request->title ?? 'Maintenance Request',
-                'description' => $request->description ?? 'No description',
-                'priority' => $request->priority ?? 'medium',
-                'status' => $request->status ?? 'pending',
-                'room_number' => $request->room->number ?? 'N/A',
-                'location' => $request->location ?? 'Room',
-                'reported_by' => $request->reportedBy->name ?? 'System',
-                'created_at' => $request->created_at->format('Y-m-d H:i:s'),
-                'estimated_time' => $request->estimated_duration ?? 60,
+                'title' => $request->title,
+                'description' => $request->description,
                 'type' => $request->type,
+                'priority' => $request->priority,
+                'status' => $request->status,
+                'room_number' => $request->room->number ?? 'N/A',
+                'location' => $request->location,
+                'reported_by' => $request->reportedBy->name ?? 'System',
+                'created_at' => $request->created_at->format('M d, H:i'),
+                'estimated_duration' => $request->estimated_duration ?? 60,
             ];
         })->toArray();
     }
@@ -878,8 +985,8 @@ class StaffDashboardController extends Controller
                 'type' => $activity->type,
                 'title' => $activity->title,
                 'description' => $activity->description,
-                'timestamp' => $activity->created_at->format('Y-m-d H:i:s'),
                 'created_at' => $activity->created_at->diffForHumans(),
+                'properties' => $activity->properties ? json_decode($activity->properties, true) : null,
             ];
         })->toArray();
     }
@@ -896,95 +1003,21 @@ class StaffDashboardController extends Controller
 
         if (!$schedule) {
             return [
-                'hasSchedule' => false,
+                'scheduled' => false,
                 'shift_start' => null,
                 'shift_end' => null,
-                'break_start' => null,
-                'break_end' => null,
-                'status' => 'not_scheduled',
-                'department' => $user->department ?? $this->getDepartmentFromRole($user->role),
+                'status' => 'off_duty',
+                'break_time' => null,
             ];
         }
 
         return [
-            'hasSchedule' => true,
-            'shift_start' => $schedule->shift_start,
-            'shift_end' => $schedule->shift_end,
-            'break_start' => $schedule->break_start,
-            'break_end' => $schedule->break_end,
+            'scheduled' => true,
+            'shift_start' => $schedule->shift_start ? Carbon::parse($schedule->shift_start)->format('H:i') : null,
+            'shift_end' => $schedule->shift_end ? Carbon::parse($schedule->shift_end)->format('H:i') : null,
             'status' => $this->determineShiftStatus($schedule),
-            'department' => $schedule->department ?? $user->department ?? $this->getDepartmentFromRole($user->role),
-            'location' => $schedule->location,
+            'break_time' => $schedule->break_time ? Carbon::parse($schedule->break_time)->format('H:i') : null,
             'notes' => $schedule->notes,
-        ];
-    }
-
-    /**
-     * Get staff statistics - REAL DATA
-     */
-    private function getStaffStats($user): array
-    {
-        $today = Carbon::today();
-        $thisWeek = Carbon::now()->startOfWeek();
-        $thisMonth = Carbon::now()->startOfMonth();
-
-        return [
-            'today' => $this->getTodayStaffStats($user),
-            'week' => $this->getWeekStaffStats($user, $thisWeek),
-            'month' => $this->getMonthStaffStats($user, $thisMonth),
-        ];
-    }
-
-    /**
-     * Get week staff statistics
-     */
-    private function getWeekStaffStats($user, $weekStart): array
-    {
-        $tasksCompleted = StaffTask::where('assigned_to', $user->id)
-            ->where('status', 'completed')
-            ->whereBetween('completed_at', [$weekStart, $weekStart->copy()->endOfWeek()])
-            ->count();
-
-        $hoursWorked = StaffSchedule::where('staff_id', $user->id)
-            ->whereBetween('date', [$weekStart, $weekStart->copy()->endOfWeek()])
-            ->sum(DB::raw('TIMESTAMPDIFF(HOUR, shift_start, shift_end)'));
-
-        $activitiesLogged = ActivityLog::where('user_id', $user->id)
-            ->whereBetween('created_at', [$weekStart, $weekStart->copy()->endOfWeek()])
-            ->count();
-
-        return [
-            'tasksCompleted' => $tasksCompleted,
-            'hoursWorked' => round($hoursWorked, 1),
-            'activitiesLogged' => $activitiesLogged,
-        ];
-    }
-
-    /**
-     * Get month staff statistics
-     */
-    private function getMonthStaffStats($user, $monthStart): array
-    {
-        $tasksCompleted = StaffTask::where('assigned_to', $user->id)
-            ->where('status', 'completed')
-            ->whereBetween('completed_at', [$monthStart, $monthStart->copy()->endOfMonth()])
-            ->count();
-
-        $hoursWorked = StaffSchedule::where('staff_id', $user->id)
-            ->whereBetween('date', [$monthStart, $monthStart->copy()->endOfMonth()])
-            ->sum(DB::raw('TIMESTAMPDIFF(HOUR, shift_start, shift_end)'));
-
-        $activitiesLogged = ActivityLog::where('user_id', $user->id)
-            ->whereBetween('created_at', [$monthStart, $monthStart->copy()->endOfMonth()])
-            ->count();
-
-        $performance = $this->calculateMonthlyPerformance($user, $monthStart);
-
-        return [
-            'tasksCompleted' => $tasksCompleted,
-            'hoursWorked' => round($hoursWorked, 1),
-            'activitiesLogged' => $activitiesLogged,
-            'performance' => $performance,
         ];
     }
 
@@ -993,59 +1026,99 @@ class StaffDashboardController extends Controller
      */
     private function getCompletedTasksCount($userId, $date): int
     {
-        return StaffTask::where('assigned_to', $userId)
-            ->where('status', 'completed')
-            ->whereDate('completed_at', $date)
-            ->count();
+        try {
+            return StaffTask::where('assigned_to', $userId)
+                ->where('status', 'completed')
+                ->whereDate('completed_at', $date)
+                ->count() ?? 0;
+        } catch (\Exception $e) {
+            Log::warning('Error getting completed tasks count', [
+                'error' => $e->getMessage(),
+                'user_id' => $userId
+            ]);
+            return 0;
+        }
+    }
+
+     private function determineShiftStatus($schedule): string
+    {
+        try {
+            if (!$schedule || !$schedule->shift_start || !$schedule->shift_end) {
+                return 'off_duty';
+            }
+
+            $now = Carbon::now();
+            $shiftStart = Carbon::parse($schedule->shift_start);
+            $shiftEnd = Carbon::parse($schedule->shift_end);
+
+            if ($now->between($shiftStart, $shiftEnd)) {
+                return 'on_duty';
+            } elseif ($now->lt($shiftStart)) {
+                return 'scheduled';
+            } else {
+                return 'shift_ended';
+            }
+        } catch (\Exception $e) {
+            Log::warning('Error determining shift status', ['error' => $e->getMessage()]);
+            return 'off_duty';
+        }
     }
 
     private function calculateHoursWorked($user, $date): float
     {
-        $schedule = StaffSchedule::where('staff_id', $user->id)
-            ->whereDate('date', $date)
-            ->first();
+        try {
+            $schedule = StaffSchedule::where('staff_id', $user->id)
+                ->whereDate('date', $date)
+                ->first();
 
-        if (!$schedule) {
+            if (!$schedule || !$schedule->shift_start || !$schedule->shift_end) {
+                return 0;
+            }
+
+            $start = Carbon::parse($schedule->shift_start);
+            $end = Carbon::parse($schedule->shift_end);
+            $now = Carbon::now();
+
+            if ($now->lt($start)) {
+                return 0;
+            }
+
+            $workEnd = $now->gt($end) ? $end : $now;
+            return round($start->diffInHours($workEnd, true), 1);
+        } catch (\Exception $e) {
+            Log::warning('Error calculating hours worked', [
+                'error' => $e->getMessage(),
+                'user_id' => $user->id
+            ]);
             return 0;
         }
+    }
 
-        $start = Carbon::parse($schedule->shift_start);
-        $end = Carbon::parse($schedule->shift_end);
+    private function updateRoomCleaningStatus($assignmentId, $status, $staffId): void
+    {
+        RoomAssignment::where('id', $assignmentId)
+            ->where('staff_id', $staffId)
+            ->update([
+                'status' => $status,
+                'completed_at' => $status === 'completed' ? now() : null,
+                'started_at' => $status === 'in_progress' ? now() : null,
+                'updated_at' => now(),
+            ]);
+    }
+
+    private function updateBookingStatus($bookingId, $status, $taskType): void
+    {
+        $updateData = ['updated_at' => now()];
         
-        return round($start->diffInMinutes($end) / 60, 1);
-    }
-
-    private function determineShiftStatus($schedule): string
-    {
-        if (!$schedule) {
-            return 'not_scheduled';
+        if ($taskType === 'check_in' && $status === 'completed') {
+            $updateData['status'] = 'checked_in';
+            $updateData['checked_in_at'] = now();
+        } elseif ($taskType === 'check_out' && $status === 'completed') {
+            $updateData['status'] = 'checked_out';
+            $updateData['checked_out_at'] = now();
         }
 
-        $now = Carbon::now();
-        $shiftStart = Carbon::parse($schedule->shift_start);
-        $shiftEnd = Carbon::parse($schedule->shift_end);
-
-        if ($now->lt($shiftStart)) {
-            return 'upcoming';
-        } elseif ($now->between($shiftStart, $shiftEnd)) {
-            return 'active';
-        } else {
-            return 'completed';
-        }
-    }
-
-    private function calculateMonthlyPerformance($user, $monthStart): int
-    {
-        $totalTasks = StaffTask::where('assigned_to', $user->id)
-            ->whereBetween('scheduled_date', [$monthStart, $monthStart->copy()->endOfMonth()])
-            ->count();
-
-        $completedTasks = StaffTask::where('assigned_to', $user->id)
-            ->where('status', 'completed')
-            ->whereBetween('completed_at', [$monthStart, $monthStart->copy()->endOfMonth()])
-            ->count();
-
-        return $totalTasks > 0 ? round(($completedTasks / $totalTasks) * 100) : 0;
+        Booking::where('id', $bookingId)->update($updateData);
     }
 
     private function getDepartmentFromRole($role): string
@@ -1055,8 +1128,8 @@ class StaffDashboardController extends Controller
             'housekeeping' => 'Housekeeping',
             'maintenance' => 'Maintenance',
             'security' => 'Security',
-            'management' => 'Management',
-            'food_service' => 'Food & Beverage',
+            'manager' => 'Management',
+            'admin' => 'Administration',
         ];
 
         return $departments[$role] ?? 'General';
@@ -1067,32 +1140,9 @@ class StaffDashboardController extends Controller
         return 'EMP' . str_pad($userId, 4, '0', STR_PAD_LEFT);
     }
 
-    private function updateRoomCleaningStatus($assignmentId, $status, $userId): void
-    {
-        RoomAssignment::where('id', $assignmentId)
-            ->where('staff_id', $userId)
-            ->update([
-                'status' => $status,
-                'completed_at' => $status === 'completed' ? now() : null,
-                'updated_at' => now(),
-            ]);
-    }
-
-    private function updateBookingStatus($bookingId, $status, $taskType): void
-    {
-        $statusMap = [
-            'check_in' => ['completed' => 'checked_in'],
-            'check_out' => ['completed' => 'completed'],
-        ];
-
-        if (isset($statusMap[$taskType][$status])) {
-            Booking::where('id', $bookingId)->update([
-                'status' => $statusMap[$taskType][$status],
-                'updated_at' => now(),
-            ]);
-        }
-    }
-
+    /**
+     * Empty data fallbacks
+     */
     private function getEmptyStaffDashboardData(): array
     {
         return [
@@ -1102,8 +1152,10 @@ class StaffDashboardController extends Controller
             'maintenanceRequests' => [],
             'recentActivities' => [],
             'schedule' => [
-                'hasSchedule' => false,
-                'status' => 'not_scheduled',
+                'scheduled' => false,
+                'shift_start' => null,
+                'shift_end' => null,
+                'status' => 'off_duty',
             ],
             'lastUpdated' => now()->toISOString(),
         ];
@@ -1115,9 +1167,39 @@ class StaffDashboardController extends Controller
             'tasksAssigned' => 0,
             'tasksCompleted' => 0,
             'tasksPending' => 0,
-            'hoursWorked' => 0,
-            'shiftStatus' => 'not_scheduled',
             'performance' => 0,
         ];
+    }
+
+    private function getEmptySecurityStats(): array
+    {
+        return [
+            'incidentsToday' => 0,
+            'patrolsCompleted' => 0,
+            'guestAssistance' => 0,
+            'keyCardIssues' => 0,
+            'tasksCompleted' => 0,
+            'shiftStatus' => 'off_duty',
+        ];
+    }
+
+    private function getEmptyGeneralStats(): array
+    {
+        return [
+            'tasksAssigned' => 0,
+            'tasksCompleted' => 0,
+            'tasksPending' => 0,
+            'hoursWorked' => 0,
+            'shiftStatus' => 'off_duty',
+            'performance' => 0,
+        ];
+    }
+
+    /**
+     * Get staff stats for API endpoint
+     */
+    private function getStaffStats($user): array
+    {
+        return $this->getTodayStaffStats($user);
     }
 }

@@ -404,21 +404,10 @@ public function tasks(Request $request): Response
     /**
      * Get all available task types
      */
-    private function getTaskTypes(): array
-    {
-        return [
-            'cleaning',
-            'maintenance',
-            'inspection',
-            'delivery',
-            'setup',
-            'security_check',
-            'guest_request',
-            'inventory',
-            'training',
-            'other',
-        ];
-    }
+        private function getTaskTypes(): array 
+        {
+            return array_keys(StaffTask::TYPES); // Return just the keys
+        }
 
     /**
      * Generate unique employee ID

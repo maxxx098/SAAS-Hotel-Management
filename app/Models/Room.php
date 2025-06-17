@@ -13,6 +13,7 @@ class Room extends Model
     use HasFactory;
 
     protected $fillable = [
+        'number',
         'name',
         'description',
         'type',

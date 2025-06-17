@@ -261,8 +261,57 @@ export default function StaffDashboard() {
 
     const renderStatsCards = () => {
         const stats = dashboardData?.todayStats ?? {};
-        
+
+        if (!dashboardData) {
+        return <div className="col-span-4 text-center text-muted-foreground">Loading dashboard data...</div>;
+       }
+
         switch (userRole) {
+            case 'security':
+            return (
+                <>
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">Security Rounds</CardTitle>
+                            <Shield className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">{stats.securityRounds || 0}</div>
+                            <p className="text-xs text-muted-foreground">Completed today</p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">Incidents</CardTitle>
+                            <AlertCircle className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">{stats.incidents || 0}</div>
+                            <p className="text-xs text-muted-foreground">Reported today</p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">Visitors</CardTitle>
+                            <Users className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">{stats.visitors || 0}</div>
+                            <p className="text-xs text-muted-foreground">Checked in</p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">Tasks Completed</CardTitle>
+                            <CheckCircle className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">{stats.tasksCompleted || 0}</div>
+                            <p className="text-xs text-muted-foreground">Today's progress</p>
+                        </CardContent>
+                    </Card>
+                </>
+            );
             case 'front_desk':
                 return (
                     <>
@@ -507,17 +556,17 @@ export default function StaffDashboard() {
                     </div>
                 </div>
 
-                {error && (
+                {(error || !dashboardData) && (
                     <Card className="border-destructive">
                         <CardContent className="pt-6">
                             <div className="flex items-center space-x-2 text-destructive">
                                 <AlertCircle className="h-4 w-4" />
-                                <p>{error}</p>
+                                <p>{error || 'Failed to load dashboard data'}</p>
                             </div>
                         </CardContent>
                     </Card>
                 )}
-
+                
                 {/* Stats Grid */}
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                     {renderStatsCards()}

@@ -25,7 +25,8 @@ class RoomController extends Controller
         // Search functionality
         if ($request->filled('search')) {
             $query->where('name', 'like', '%' . $request->search . '%')
-                  ->orWhere('type', 'like', '%' . $request->search . '%');
+                  ->orWhere('type', 'like', '%' . $request->search . '%')
+                  ->orWhere('number', 'like', '%' . $request->search . '%');
         }
 
         // Filter by type
@@ -75,6 +76,7 @@ class RoomController extends Controller
    public function store(Request $request): RedirectResponse
 {
     $validated = $request->validate([
+        'number' => 'required|string|max:255|unique:rooms',
         'name' => 'required|string|max:255|unique:rooms',
         'description' => 'nullable|string',
         'type' => 'required|string|in:single,double,suite,family,deluxe',
@@ -137,6 +139,7 @@ class RoomController extends Controller
     public function update(Request $request, Room $room): RedirectResponse
     {
         $validated = $request->validate([
+            'number' => ['required', 'string', 'max:255', Rule::unique('rooms')->ignore($room->id)],
             'name' => ['required', 'string', 'max:255', Rule::unique('rooms')->ignore($room->id)],
             'description' => 'nullable|string',
             'type' => 'required|string|in:single,double,suite,family,deluxe',

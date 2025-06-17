@@ -381,7 +381,7 @@ interface PageProps {
 
 const AdminTaskAssignment: React.FC = () => {
   let { staff, rooms, tasks, taskTypes, departments } = usePage<PageProps>().props;
-  taskTypes = Array.isArray(taskTypes) ? taskTypes : [];
+  taskTypes = Array.isArray(taskTypes) && taskTypes.length > 0 ? taskTypes : ['general']; // Provide a default if empty
   
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -630,7 +630,7 @@ const openEditDialog = (task: Task) => {
             <SelectContent>
               {taskTypes.map((type) => (
                 <SelectItem key={type} value={type}>
-                  {type.replace('_', ' ').toUpperCase()}
+                  {type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                 </SelectItem>
               ))}
             </SelectContent>

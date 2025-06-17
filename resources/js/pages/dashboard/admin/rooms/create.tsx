@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Head, router } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
+
 import { 
     Building,
     DollarSign,
@@ -14,7 +15,8 @@ import {
     ArrowLeft,
     Plus,
     X,
-    Star
+    Star,
+    Hash,
 } from 'lucide-react';
 
 // UI Components (keeping your existing components)
@@ -268,45 +270,47 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 function CreateRoomPage({ roomTypes, amenitiesOptions }: CreateRoomProps) {
     type FormData = {
-        name: string;
-        description: string;
-        type: string;
-        price_per_night: string;
-        capacity: string;
-        beds: string;
-        size: string;
-        amenities: string[];
-        images: string[];
-        is_available: boolean;
-        is_active: boolean;
-    };
+    number: string;  // Add this line
+    name: string;
+    description: string;
+    type: string;
+    price_per_night: string;
+    capacity: string;
+    beds: string;
+    size: string;
+    amenities: string[];
+    images: string[];
+    is_available: boolean;
+    is_active: boolean;
+};
 
-    const [formData, setFormData] = useState<FormData>({
-        name: '',
-        description: '',
-        type: roomTypes?.[0]?.value || 'single',
-        price_per_night: '',
-        capacity: '',
-        beds: '',
-        size: '',
-        amenities: [],
-        images: [''],
-        is_available: true,
-        is_active: true
-    });
-
-    type Errors = {
-        name?: string;
-        description?: string;
-        type?: string;
-        price_per_night?: string;
-        capacity?: string;
-        beds?: string;
-        size?: string;
-        amenities?: string;
-        images?: string;
-        [key: string]: string | undefined;
-    };
+  const [formData, setFormData] = useState<FormData>({
+    number: '',  // Add this line
+    name: '',
+    description: '',
+    type: roomTypes?.[0]?.value || 'single',
+    price_per_night: '',
+    capacity: '',
+    beds: '',
+    size: '',
+    amenities: [],
+    images: [''],
+    is_available: true,
+    is_active: true
+});
+type Errors = {
+    number?: string;  // Add this line
+    name?: string;
+    description?: string;
+    type?: string;
+    price_per_night?: string;
+    capacity?: string;
+    beds?: string;
+    size?: string;
+    amenities?: string;
+    images?: string;
+    [key: string]: string | undefined;
+};
     
     const [errors, setErrors] = useState<Errors>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -384,9 +388,10 @@ const removeImageField = (index: number) => {
     }
 };
 
-    const validateForm = () => {
+   const validateForm = () => {
     const newErrors: Errors = {};
 
+    if (!formData.number.trim()) newErrors.number = 'Room number is required';  // Add this line
     if (!formData.name.trim()) newErrors.name = 'Room name is required';
     if (!formData.type) newErrors.type = 'Room type is required';
     if (!formData.price_per_night || Number(formData.price_per_night) <= 0) {
@@ -420,7 +425,7 @@ const removeImageField = (index: number) => {
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
 };
-   const handleSubmit = async () => {
+  const handleSubmit = async () => {
     if (!validateForm()) return;
 
     setIsSubmitting(true);
@@ -432,6 +437,7 @@ const removeImageField = (index: number) => {
             .map(img => img.trim()); // Trim whitespace
         
         const submitData = {
+            number: formData.number,  // Add this line
             name: formData.name,
             description: formData.description || null,
             type: formData.type,
@@ -440,12 +446,12 @@ const removeImageField = (index: number) => {
             beds: parseInt(formData.beds),
             size: formData.size ? parseFloat(formData.size) : null,
             amenities: formData.amenities,
-            images: cleanedImages, // This could be an empty array now
+            images: cleanedImages,
             is_available: formData.is_available,
             is_active: formData.is_active
         };
 
-        console.log('Submitting data:', submitData); // Debug log
+        console.log('Submitting data:', submitData);
 
         // Submit to Laravel using Inertia
         router.post(route('admin.rooms.store'), submitData, {
@@ -557,6 +563,7 @@ const removeImageField = (index: number) => {
                             Specify room capacity and physical details
                         </CardDescription>
                     </CardHeader>
+                    
                     <CardContent className="space-y-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                             <div className="space-y-2">
@@ -576,6 +583,24 @@ const removeImageField = (index: number) => {
                                     required
                                 />
                                 {errors.price_per_night && <p className="text-sm text-destructive">{errors.price_per_night}</p>}
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="number" className="flex items-center gap-2">
+                                    <Hash className="h-4 w-4" />
+                                    Room Number *
+                                </Label>
+                                <Input
+                                    id="number"
+                                    placeholder="e.g., 101, A-205, Suite-301"
+                                    value={formData.number}
+                                    onChange={(e) => handleInputChange('number', e.target.value)}
+                                    className={errors.number ? 'border-destructive' : ''}
+                                    required
+                                />
+                                {errors.number && <p className="text-sm text-destructive">{errors.number}</p>}
+                                <p className="text-xs text-muted-foreground">
+                                    Unique identifier for this room (e.g., floor-room like "101" or "A-205")
+                                </p>
                             </div>
 
                             <div className="space-y-2">
