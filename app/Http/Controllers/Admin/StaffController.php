@@ -6,12 +6,21 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\StaffTask; 
 use App\Models\Room; 
+use App\Models\Booking;
+use App\Models\MaintenanceRequest;
+use App\Models\StaffSchedule;
+use App\Models\RoomAssignment;
+use App\Models\ActivityLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class StaffController extends Controller
 {
@@ -256,44 +265,171 @@ public function tasks(Request $request): Response
     /**
      * Store a new task assignment
      */
-    public function storeTask(Request $request)
-{
-    $validator = Validator::make($request->all(), [
-        'title' => 'required|string|max:255',
-        'description' => 'nullable|string',
-        'type' => 'required|string|in:' . implode(',', array_keys(StaffTask::TYPES)), // Use the actual task types from the model
-        'priority' => 'required|string|in:low,medium,high,urgent',
-        'assigned_to' => 'required|exists:users,id',
-        'room_id' => 'nullable|exists:rooms,id',
-        'scheduled_at' => 'nullable|date|after_or_equal:today', // Changed to match model field
-        'estimated_duration' => 'nullable|integer|min:15',
-    ]);
+   public function storeTask(Request $request) 
+{     
+    $validator = Validator::make($request->all(), [         
+        'title' => 'required|string|max:255',         
+        'description' => 'nullable|string',         
+        'type' => 'required|string|in:' . implode(',', array_keys(StaffTask::TYPES)),         
+        'priority' => 'required|string|in:low,medium,high,urgent',         
+        'assigned_to' => 'required|exists:users,id',         
+        'room_id' => 'nullable|exists:rooms,id',         
+        'scheduled_at' => 'nullable|date|after_or_equal:today',         
+        'estimated_duration' => 'nullable|integer|min:15',     
+    ]);      
 
-    if ($validator->fails()) {
-        return back()->withErrors($validator)->withInput();
-    }
+    if ($validator->fails()) {         
+        return back()->withErrors($validator)->withInput();     
+    }      
 
-    try {
-        StaffTask::create([
-            'title' => $request->title,
-            'description' => $request->description,
-            'type' => $request->type,
-            'priority' => $request->priority,
-            'status' => 'pending',
-            'assigned_to' => $request->assigned_to,
-            'room_id' => $request->room_id,
-            'scheduled_at' => $request->scheduled_at,
-            'estimated_duration' => $request->estimated_duration,
-            'created_by' => auth()->id(),
+    try {         
+        // Get the assigned staff member to determine their role
+        $assignedStaff = User::find($request->assigned_to);
+        $taskType = $request->type;
+        
+        // Create task based on staff role and task type
+        switch ($assignedStaff->role) {
+            case 'housekeeping':
+                if (in_array($taskType, ['room_cleaning', 'cleaning'])) {
+                    // Create RoomAssignment for housekeeping room cleaning tasks
+                    RoomAssignment::create([
+                        'staff_id' => $request->assigned_to,
+                        'room_id' => $request->room_id,
+                        'date' => Carbon::parse($request->scheduled_at)->toDateString(),
+                        'scheduled_time' => Carbon::parse($request->scheduled_at)->toTimeString(),
+                        'cleaning_type' => $this->determineCleaningType($taskType),
+                        'priority' => $request->priority,
+                        'status' => 'pending',
+                        'estimated_duration' => $request->estimated_duration ?? 45,
+                        'notes' => $request->description,
+                        'assigned_by' => auth()->id(),
+                    ]);
+                } else {
+                    // Create regular StaffTask for other housekeeping tasks
+                    StaffTask::create([
+                        'title' => $request->title,
+                        'description' => $request->description,
+                        'type' => $request->type,
+                        'priority' => $request->priority,
+                        'status' => 'pending',
+                        'assigned_to' => $request->assigned_to,
+                        'room_id' => $request->room_id,
+                        'scheduled_at' => $request->scheduled_at,
+                        'estimated_duration' => $request->estimated_duration,
+                        'created_by' => auth()->id(),
+                    ]);
+                }
+                break;
+                
+            case 'maintenance':
+                if (in_array($taskType, ['maintenance', 'repair', 'inspection'])) {
+                    // Create MaintenanceRequest for maintenance tasks
+                    MaintenanceRequest::create([
+                        'title' => $request->title,
+                        'description' => $request->description,
+                        'type' => $this->mapTaskTypeToMaintenanceType($taskType),
+                        'priority' => $request->priority,
+                        'status' => 'pending',
+                        'room_id' => $request->room_id,
+                        'location' => $request->room_id ? 'Room' : 'General',
+                        'assigned_to' => $request->assigned_to,
+                        'reported_by' => auth()->id(),
+                        'estimated_duration' => $request->estimated_duration ?? 60,
+                        'scheduled_at' => $request->scheduled_at,
+                    ]);
+                } else {
+                    // Create regular StaffTask for other maintenance tasks
+                    StaffTask::create([
+                        'title' => $request->title,
+                        'description' => $request->description,
+                        'type' => $request->type,
+                        'priority' => $request->priority,
+                        'status' => 'pending',
+                        'assigned_to' => $request->assigned_to,
+                        'room_id' => $request->room_id,
+                        'scheduled_at' => $request->scheduled_at,
+                        'estimated_duration' => $request->estimated_duration,
+                        'created_by' => auth()->id(),
+                    ]);
+                }
+                break;
+                
+            case 'front_desk':
+                // For front desk, always use StaffTask but may also need to update bookings
+                StaffTask::create([
+                    'title' => $request->title,
+                    'description' => $request->description,
+                    'type' => $request->type,
+                    'priority' => $request->priority,
+                    'status' => 'pending',
+                    'assigned_to' => $request->assigned_to,
+                    'room_id' => $request->room_id,
+                    'scheduled_at' => $request->scheduled_at,
+                    'estimated_duration' => $request->estimated_duration,
+                    'created_by' => auth()->id(),
+                ]);
+                break;
+                
+            case 'security':
+                StaffTask::create([
+                    'title' => $request->title,
+                    'description' => $request->description,
+                    'type' => $request->type,
+                    'priority' => $request->priority,
+                    'status' => 'pending',
+                    'assigned_to' => $request->assigned_to,
+                    'room_id' => $request->room_id,
+                    'scheduled_at' => $request->scheduled_at,
+                    'estimated_duration' => $request->estimated_duration,
+                    'created_by' => auth()->id(),
+                ]);
+                break;
+                
+            default:
+                // For general staff and unknown roles, use StaffTask
+                StaffTask::create([
+                    'title' => $request->title,
+                    'description' => $request->description,
+                    'type' => $request->type,
+                    'priority' => $request->priority,
+                    'status' => 'pending',
+                    'assigned_to' => $request->assigned_to,
+                    'room_id' => $request->room_id,
+                    'scheduled_at' => $request->scheduled_at,
+                    'estimated_duration' => $request->estimated_duration,
+                    'created_by' => auth()->id(),
+                ]);
+                break;
+        }
+
+        // Log the activity
+        ActivityLog::create([
+            'user_id' => auth()->id(),
+            'type' => 'task_assigned',
+            'title' => 'Task Assigned',
+            'description' => "Assigned task '{$request->title}' to {$assignedStaff->name}",
+            'properties' => json_encode([
+                'task_title' => $request->title,
+                'assigned_to' => $request->assigned_to,
+                'assigned_to_name' => $assignedStaff->name,
+                'task_type' => $request->type,
+                'priority' => $request->priority,
+            ]),
         ]);
 
-        return back()->with('success', 'Task assigned successfully.');
+        return back()->with('success', 'Task assigned successfully.');      
 
-    } catch (\Exception $e) {
-        return back()->withErrors(['error' => 'Failed to assign task. Please try again.']);
-    }
+    } catch (\Exception $e) {         
+        Log::error('Failed to store task', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+            'request_data' => $request->all(),
+            'admin_id' => auth()->id(),
+        ]);
+        
+        return back()->withErrors(['error' => 'Failed to assign task. Please try again.']);     
+    } 
 }
-
 
     /**
      * Update an existing task
@@ -420,4 +556,37 @@ public function tasks(Request $request): Response
 
         return $employeeId;
     }
+
+    /**
+ * Helper method to determine cleaning type based on task type
+ */
+private function determineCleaningType($taskType): string
+{
+    $cleaningTypes = [
+        'room_cleaning' => 'standard',
+        'deep_cleaning' => 'deep',
+        'checkout_cleaning' => 'checkout',
+        'maintenance_cleaning' => 'maintenance',
+    ];
+    
+    return $cleaningTypes[$taskType] ?? 'standard';
+}
+
+/**
+ * Helper method to map task types to maintenance request types
+ */
+private function mapTaskTypeToMaintenanceType($taskType): string
+{
+    $maintenanceTypes = [
+        'maintenance' => 'general',
+        'repair' => 'repair',
+        'inspection' => 'inspection',
+        'plumbing' => 'plumbing',
+        'electrical' => 'electrical',
+        'hvac' => 'hvac',
+        'cleaning' => 'cleaning',
+    ];
+    
+    return $maintenanceTypes[$taskType] ?? 'general';
+}
 }

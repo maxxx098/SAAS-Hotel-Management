@@ -412,6 +412,54 @@ const AdminTaskAssignment: React.FC = () => {
     estimated_duration: 60,
     location: ''
   });
+const getTaskTypesForRole = (staffId: string) => {
+    if (!staffId) return taskTypes;
+    
+    const selectedStaff = staff.find(s => s.id.toString() === staffId);
+    if (!selectedStaff) return taskTypes;
+    
+    // Define task types per role based on your backend logic
+    const roleTaskTypes = {
+        'housekeeping': ['room_cleaning', 'cleaning', 'laundry', 'maintenance_request', 'general'],
+        'maintenance': ['maintenance', 'repair', 'inspection', 'preventive_maintenance', 'general'],
+        'front_desk': ['guest_service', 'check_in', 'check_out', 'booking_management', 'general'],
+        'security': ['security_check', 'patrol', 'incident_report', 'access_control', 'general'],
+        'management': taskTypes, // All types available
+    };
+    
+    return roleTaskTypes[selectedStaff.role as keyof typeof roleTaskTypes] || taskTypes;
+};
+const getRoleInfo = (staffId: string) => {
+    if (!staffId) return null;
+    
+    const selectedStaff = staff.find(s => s.id.toString() === staffId);
+    if (!selectedStaff) return null;
+    
+    const roleInfo = {
+        'housekeeping': {
+            description: 'Room cleaning tasks will create room assignments automatically',
+            requiresRoom: ['room_cleaning', 'cleaning'].includes(formData.type),
+            defaultDuration: 45
+        },
+        'maintenance': {
+            description: 'Maintenance tasks will create maintenance requests automatically',
+            requiresRoom: ['maintenance', 'repair', 'inspection'].includes(formData.type),
+            defaultDuration: 60
+        },
+        'front_desk': {
+            description: 'Front desk tasks for guest services and operations',
+            requiresRoom: false,
+            defaultDuration: 30
+        },
+        'security': {
+            description: 'Security and safety related tasks',
+            requiresRoom: false,
+            defaultDuration: 30
+        }
+    };
+    
+    return roleInfo[selectedStaff.role as keyof typeof roleInfo] || null;
+};
 
   const breadcrumbItems: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/admin' },
@@ -441,30 +489,30 @@ const AdminTaskAssignment: React.FC = () => {
     management: 'bg-green-100 text-green-800'
   };
 
+// Update handleCreateTask to send proper data format
 const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Add validation - RETURN EARLY if validation fails
-    if (!validateForm()) {
-        return; // Don't proceed if validation fails
-    }
+    if (!validateForm()) return;
     
     try {
-        const submitData = {
-            ...formData,
-            room_id: formData.room_id === 'none' ? null : parseInt(formData.room_id) || null,
+        // Prepare submission data to match backend expectations
+        const submissionData = {
+            title: formData.title.trim(),
+            description: formData.description?.trim() || null,
+            type: formData.type,
+            priority: formData.priority,
             assigned_to: parseInt(formData.assigned_to),
-            scheduled_at: formData.scheduled_date ? format(formData.scheduled_date, 'yyyy-MM-dd') : null // Changed from scheduled_date to scheduled_at
+            room_id: formData.room_id === 'none' || !formData.room_id ? null : parseInt(formData.room_id),
+            scheduled_at: formData.scheduled_date && formData.scheduled_time 
+                ? `${format(formData.scheduled_date, 'yyyy-MM-dd')} ${formData.scheduled_time}`
+                : formData.scheduled_date 
+                    ? format(formData.scheduled_date, 'yyyy-MM-dd')
+                    : null,
+            estimated_duration: formData.estimated_duration || null,
         };
 
-        // Remove undefined values
-        Object.keys(submitData).forEach(key => {
-            if (submitData[key as keyof typeof submitData] === undefined) {
-                delete submitData[key as keyof typeof submitData];
-            }
-        });
-
-        router.post(route('admin.staff.tasks.store'), submitData, {
+        router.post(route('admin.staff.tasks.store'), submissionData, {
             onSuccess: () => {
                 setIsCreateDialogOpen(false);
                 resetForm();
@@ -475,9 +523,12 @@ const handleCreateTask = async (e: React.FormEvent) => {
             },
             onError: (errors: any) => {
                 console.log('Validation errors:', errors);
+                
+                // Handle specific validation errors from backend
+                const errorMessages = Object.values(errors).flat();
                 toast({
-                    title: "Error",
-                    description: "Failed to create task. Please check your input.",
+                    title: "Validation Error",
+                    description: errorMessages.join(" "),
                     variant: "destructive",
                 });
             }
@@ -486,38 +537,36 @@ const handleCreateTask = async (e: React.FormEvent) => {
         console.error('Error creating task:', error);
         toast({
             title: "Error",
-            description: "An unexpected error occurred.",
+            description: "An unexpected error occurred. Please try again.",
             variant: "destructive",
         });
     }
 };
 
+// Update handleUpdateTask similarly
 const handleUpdateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Add validation - RETURN EARLY if validation fails
-    if (!validateForm()) {
-        return; // Don't proceed if validation fails
-    }
-    
+    if (!validateForm()) return;
     if (!selectedTask) return;
 
     try {
-        const submitData = {
-            ...formData,
-            room_id: formData.room_id === 'none' ? null : parseInt(formData.room_id) || null,
+        const submissionData = {
+            title: formData.title.trim(),
+            description: formData.description?.trim() || null,
+            type: formData.type,
+            priority: formData.priority,
             assigned_to: parseInt(formData.assigned_to),
-            scheduled_at: formData.scheduled_date ? format(formData.scheduled_date, 'yyyy-MM-dd') : null // Changed from scheduled_date to scheduled_at
+            room_id: formData.room_id === 'none' || !formData.room_id ? null : parseInt(formData.room_id),
+            scheduled_at: formData.scheduled_date && formData.scheduled_time 
+                ? `${format(formData.scheduled_date, 'yyyy-MM-dd')} ${formData.scheduled_time}`
+                : formData.scheduled_date 
+                    ? format(formData.scheduled_date, 'yyyy-MM-dd')
+                    : null,
+            estimated_duration: formData.estimated_duration || null,
         };
 
-        // Remove undefined values
-        Object.keys(submitData).forEach(key => {
-            if (submitData[key as keyof typeof submitData] === undefined) {
-                delete submitData[key as keyof typeof submitData];
-            }
-        });
-
-        router.put(route('admin.staff.tasks.update', selectedTask.id), submitData, {
+        router.put(route('admin.staff.tasks.update', selectedTask.id), submissionData, {
             onSuccess: () => {
                 setIsEditDialogOpen(false);
                 setSelectedTask(null);
@@ -528,10 +577,10 @@ const handleUpdateTask = async (e: React.FormEvent) => {
                 });
             },
             onError: (errors: any) => {
-                console.log('Validation errors:', errors);
+                const errorMessages = Object.values(errors).flat();
                 toast({
-                    title: "Error",
-                    description: "Failed to update task. Please check your input.",
+                    title: "Validation Error",
+                    description: errorMessages.join(" "),
                     variant: "destructive",
                 });
             }
@@ -540,7 +589,7 @@ const handleUpdateTask = async (e: React.FormEvent) => {
         console.error('Error updating task:', error);
         toast({
             title: "Error",
-            description: "An unexpected error occurred.",
+            description: "An unexpected error occurred. Please try again.",
             variant: "destructive",
         });
     }
@@ -564,12 +613,16 @@ const handleDeleteTask = async (taskId: number) => {
   }
 };
 
-// 4. Add validation check before submit
+// Update the validateForm function to match backend validation
 const validateForm = () => {
     const errors = [];
     
     if (!formData.title.trim()) {
         errors.push("Task title is required.");
+    }
+    
+    if (formData.title.length > 255) {
+        errors.push("Task title must not exceed 255 characters.");
     }
     
     if (!formData.type) {
@@ -580,11 +633,40 @@ const validateForm = () => {
         errors.push("Please assign the task to a staff member.");
     }
     
-    if (!formData.scheduled_date) {
-        errors.push("Scheduled date is required.");
+    if (!formData.priority || !['low', 'medium', 'high', 'urgent'].includes(formData.priority)) {
+        errors.push("Please select a valid priority level.");
     }
     
-    if (formData.estimated_duration < 15) {
+    // Validate assigned staff exists
+    const assignedStaff = staff.find(s => s.id.toString() === formData.assigned_to);
+    if (!assignedStaff) {
+        errors.push("Selected staff member is invalid.");
+    }
+    
+    // Validate room exists if provided
+    if (formData.room_id && formData.room_id !== 'none') {
+        const roomExists = rooms.find(r => r.id.toString() === formData.room_id);
+        if (!roomExists) {
+            errors.push("Selected room is invalid.");
+        }
+    }
+    
+    // Validate scheduled date
+    if (!formData.scheduled_date) {
+        errors.push("Scheduled date is required.");
+    } else {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const scheduledDate = new Date(formData.scheduled_date);
+        scheduledDate.setHours(0, 0, 0, 0);
+        
+        if (scheduledDate < today) {
+            errors.push("Scheduled date must be today or in the future.");
+        }
+    }
+    
+    // Validate estimated duration
+    if (formData.estimated_duration && formData.estimated_duration < 15) {
         errors.push("Estimated duration must be at least 15 minutes.");
     }
     
@@ -601,37 +683,49 @@ const validateForm = () => {
     return true;
 };
 
-
 const resetForm = () => {
-  setFormData({
-    title: '',
-    description: '',
-    type: '',
-    priority: 'medium',
-    assigned_to: '',
-    room_id: 'none', // Changed from '' to 'none'
-    scheduled_date: undefined,
-    scheduled_time: '',
-    estimated_duration: 60,
-    location: ''
-  });
+    setFormData({
+        title: '',
+        description: '',
+        type: '',
+        priority: 'medium',
+        assigned_to: '',
+        room_id: 'none',
+        scheduled_date: undefined,
+        scheduled_time: '',
+        estimated_duration: 60,
+        location: ''
+    });
 };
 
 const openEditDialog = (task: Task) => {
-  setSelectedTask(task);
-  setFormData({
-    title: task.title,
-    description: task.description,
-    type: task.type,
-    priority: task.priority,
-    assigned_to: task.assigned_to.toString(),
-    room_id: task.room_id?.toString() || 'none', // Changed from '' to 'none'
-    scheduled_date: new Date(task.scheduled_date),
-    scheduled_time: task.scheduled_time || '',
-    estimated_duration: task.estimated_duration,
-    location: task.location || ''
-  });
-  setIsEditDialogOpen(true);
+    setSelectedTask(task);
+    
+    // Parse scheduled_at if it contains both date and time
+    let scheduledDate: Date | undefined;
+    let scheduledTime = '';
+    
+    if (task.scheduled_date) {
+        scheduledDate = new Date(task.scheduled_date);
+        // If the backend returns datetime string, extract time
+        if (task.scheduled_time) {
+            scheduledTime = task.scheduled_time;
+        }
+    }
+    
+    setFormData({
+        title: task.title,
+        description: task.description || '',
+        type: task.type,
+        priority: task.priority,
+        assigned_to: task.assigned_to.toString(),
+        room_id: task.room_id?.toString() || 'none',
+        scheduled_date: scheduledDate,
+        scheduled_time: scheduledTime,
+        estimated_duration: task.estimated_duration || 60,
+        location: task.location || ''
+    });
+    setIsEditDialogOpen(true);
 };
 
   const filteredTasks = tasks.filter(task => {
@@ -668,21 +762,45 @@ const openEditDialog = (task: Task) => {
           />
         </div>
         
-        <div className="space-y-2">
-          <Label htmlFor="type">Task Type *</Label>
-          <Select value={formData.type} onValueChange={(value) => setFormData({ ...formData, type: value })}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select task type" />
-            </SelectTrigger>
-            <SelectContent>
-              {taskTypes.map((type) => (
-                <SelectItem key={type} value={type}>
-                  {type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+{(() => {
+  const availableTypes = getTaskTypesForRole(formData.assigned_to);
+  const roleInfo = getRoleInfo(formData.assigned_to);
+  return (
+    <div className="space-y-2">
+      <Label htmlFor="type">Task Type *</Label>
+      <Select 
+        value={formData.type} 
+        onValueChange={(value) => {
+          setFormData({ ...formData, type: value });
+          // Auto-set default duration based on role and type
+          if (roleInfo && !formData.estimated_duration) {
+            setFormData(prev => ({ 
+              ...prev, 
+              type: value, 
+              estimated_duration: roleInfo.defaultDuration 
+            }));
+          }
+        }}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="Select task type" />
+        </SelectTrigger>
+        <SelectContent>
+          {availableTypes.map((type) => (
+            <SelectItem key={type} value={type}>
+              {type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {roleInfo && (
+        <p className="text-xs text-muted-foreground">
+          {roleInfo.description}
+        </p>
+      )}
+    </div>
+  );
+})()}
       </div>
 
       <div className="col-span-2 space-y-2">
@@ -771,34 +889,64 @@ const openEditDialog = (task: Task) => {
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-      <div className="space-y-2">
-        <Label htmlFor="room_id">Room (Optional)</Label>
-        <Select value={formData.room_id} onValueChange={(value) => setFormData({ ...formData, room_id: value })}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select room" />
-          </SelectTrigger>
-          <SelectContent>
+{(() => {
+  const roleInfo = getRoleInfo(formData.assigned_to);
+  const isRoomRequired = roleInfo ? roleInfo.requiresRoom : false;
+  return (
+    <div className="space-y-2">
+      <Label htmlFor="room_id">
+        Room {isRoomRequired ? '*' : '(Optional)'}
+      </Label>
+      <Select 
+        value={formData.room_id} 
+        onValueChange={(value) => setFormData({ ...formData, room_id: value })}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="Select room" />
+        </SelectTrigger>
+        <SelectContent>
+          {!isRoomRequired && (
             <SelectItem value="none">No specific room</SelectItem>
-            {rooms.map((room) => (
-              <SelectItem key={room.id} value={room.id.toString()}>
-                Room {room.number} ({room.type})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+          )}
+          {rooms.map((room) => (
+            <SelectItem key={room.id} value={room.id.toString()}>
+              Room {room.number} ({room.type})
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {isRoomRequired && (
+        <p className="text-xs text-red-600">
+          Room selection is required for this task type
+        </p>
+      )}
+    </div>
+  );
+})()}
 
-        <div className="space-y-2">
-          <Label htmlFor="estimated_duration">Estimated Duration (minutes)</Label>
-          <Input
-            id="estimated_duration"
-            type="number"
-            min="15"
-            step="15"
-            value={formData.estimated_duration}
-            onChange={(e) => setFormData({ ...formData, estimated_duration: parseInt(e.target.value) || 60 })}
-          />
-        </div>
+      {(() => {
+        const roleInfo = getRoleInfo(formData.assigned_to);
+        return (
+          <div className="space-y-2">
+            <Label htmlFor="estimated_duration">Estimated Duration (minutes)</Label>
+            <Input
+              id="estimated_duration"
+              type="number"
+              min="15"
+              step="15"
+              value={formData.estimated_duration}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  estimated_duration:
+                    parseInt(e.target.value) || (roleInfo?.defaultDuration ?? 60),
+                })
+              }
+              placeholder={roleInfo ? `Default: ${roleInfo.defaultDuration} min` : "60"}
+            />
+          </div>
+        );
+      })()}
       </div>
 
       <div className="space-y-2">
