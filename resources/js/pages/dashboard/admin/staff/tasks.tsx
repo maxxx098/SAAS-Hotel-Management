@@ -51,7 +51,7 @@ interface TabsListProps {
     children: React.ReactNode;
 }
 const TabsList: React.FC<TabsListProps> = ({ children }) => (
-    <div className="flex gap-2 border-b mb-4">{children}</div>
+    <div className="flex gap-2 border-b border-border mb-4">{children}</div>
 );
 
 interface TabsTriggerProps {
@@ -67,7 +67,7 @@ const TabsTrigger: React.FC<TabsTriggerProps> = ({ value, children }) => {
             className={`px-4 py-2 font-medium border-b-2 transition-colors ${
                 isActive
                     ? 'border-primary text-primary'
-                    : 'border-transparent text-muted-foreground hover:text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
             onClick={() => ctx.setValue(value)}
         >
@@ -192,7 +192,7 @@ export const PopoverContent: React.FC<PopoverContentProps> = ({ children, classN
     return (
         <div
             ref={contentRef}
-            className={`absolute z-50 mt-2 bg-white border rounded shadow-lg ${className ?? ''}`}
+            className={`absolute z-50 mt-2 bg-background border border-border rounded-md shadow-lg ${className ?? ''}`}
             style={{ minWidth: 180 }}
         >
             {children}
@@ -271,23 +271,23 @@ export const Calendar = React.forwardRef<HTMLDivElement, CalendarProps>(
         const dayNames = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
         return (
-            <div ref={ref} className={className}>
+            <div ref={ref} className={cn("p-3 bg-background text-foreground", className)}>
                 <div className="flex items-center justify-between mb-2">
                     <button
                         type="button"
                         onClick={handlePrevMonth}
-                        className="px-2 py-1 rounded hover:bg-muted"
+                        className="px-2 py-1 rounded hover:bg-muted text-foreground"
                         aria-label="Previous month"
                     >
                         &lt;
                     </button>
-                    <span className="font-semibold">
+                    <span className="font-semibold text-foreground">
                         {monthNames[viewMonth]} {viewYear}
                     </span>
                     <button
                         type="button"
                         onClick={handleNextMonth}
-                        className="px-2 py-1 rounded hover:bg-muted"
+                        className="px-2 py-1 rounded hover:bg-muted text-foreground"
                         aria-label="Next month"
                     >
                         &gt;
@@ -295,7 +295,7 @@ export const Calendar = React.forwardRef<HTMLDivElement, CalendarProps>(
                 </div>
                 <div className="grid grid-cols-7 gap-1 text-xs text-center mb-1">
                     {dayNames.map((d) => (
-                        <div key={d} className="font-medium">{d}</div>
+                        <div key={d} className="font-medium text-muted-foreground">{d}</div>
                     ))}
                 </div>
                 <div className="grid grid-cols-7 gap-1">
@@ -304,10 +304,11 @@ export const Calendar = React.forwardRef<HTMLDivElement, CalendarProps>(
                             <button
                                 key={idx}
                                 type="button"
-                                className={`rounded p-1 w-8 h-8 text-sm
-                                    ${isSameDay(date, selected) ? "bg-primary text-white" : ""}
-                                    ${isSameDay(date, today) ? "border border-primary" : ""}
-                                    hover:bg-muted`}
+                                className={cn(
+                                    "rounded p-1 w-8 h-8 text-sm text-foreground hover:bg-muted transition-colors",
+                                    isSameDay(date, selected) && "bg-primary text-primary-foreground hover:bg-primary",
+                                    isSameDay(date, today) && !isSameDay(date, selected) && "border border-primary"
+                                )}
                                 onClick={() => onSelect?.(date)}
                             >
                                 {date.getDate()}
@@ -321,18 +322,22 @@ export const Calendar = React.forwardRef<HTMLDivElement, CalendarProps>(
         );
     }
 );
-Calendar.displayName = "Calendar";
+
 export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {}
 
 export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
     ({ className, ...props }, ref) => (
         <textarea
             ref={ref}
-            className={`border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary ${className ?? ''}`}
+            className={cn(
+                "border border-input rounded px-3 py-2 bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
+                className
+            )}
             {...props}
         />
     )
 );
+
 Textarea.displayName = 'Textarea';
 interface Staff {
   id: number;
@@ -437,63 +442,108 @@ const AdminTaskAssignment: React.FC = () => {
   };
 
 const handleCreateTask = async (e: React.FormEvent) => {
-  e.preventDefault();
-  
-  try {
-    router.post(route('admin.staff.tasks.store'), {
-      ...formData,
-      room_id: formData.room_id === 'none' ? null : parseInt(formData.room_id) || null,
-      assigned_to: parseInt(formData.assigned_to),
-      scheduled_date: formData.scheduled_date ? format(formData.scheduled_date, 'yyyy-MM-dd') : null
-    }, {
-      onSuccess: () => {
-        setIsCreateDialogOpen(false);
-        resetForm();
-        toast({
-          title: "Success",
-          description: "Task created and assigned successfully.",
+    e.preventDefault();
+    
+    // Add validation - RETURN EARLY if validation fails
+    if (!validateForm()) {
+        return; // Don't proceed if validation fails
+    }
+    
+    try {
+        const submitData = {
+            ...formData,
+            room_id: formData.room_id === 'none' ? null : parseInt(formData.room_id) || null,
+            assigned_to: parseInt(formData.assigned_to),
+            scheduled_at: formData.scheduled_date ? format(formData.scheduled_date, 'yyyy-MM-dd') : null // Changed from scheduled_date to scheduled_at
+        };
+
+        // Remove undefined values
+        Object.keys(submitData).forEach(key => {
+            if (submitData[key as keyof typeof submitData] === undefined) {
+                delete submitData[key as keyof typeof submitData];
+            }
         });
-      },
-      onError: (errors: any) => {
-        console.log('Validation errors:', errors);
-        toast({
-          title: "Error",
-          description: "Failed to create task. Please check your input.",
-          variant: "destructive",
+
+        router.post(route('admin.staff.tasks.store'), submitData, {
+            onSuccess: () => {
+                setIsCreateDialogOpen(false);
+                resetForm();
+                toast({
+                    title: "Success",
+                    description: "Task created and assigned successfully.",
+                });
+            },
+            onError: (errors: any) => {
+                console.log('Validation errors:', errors);
+                toast({
+                    title: "Error",
+                    description: "Failed to create task. Please check your input.",
+                    variant: "destructive",
+                });
+            }
         });
-      }
-    });
-  } catch (error) {
-    console.error('Error creating task:', error);
-  }
+    } catch (error) {
+        console.error('Error creating task:', error);
+        toast({
+            title: "Error",
+            description: "An unexpected error occurred.",
+            variant: "destructive",
+        });
+    }
 };
 
-// 2. Fix update route
 const handleUpdateTask = async (e: React.FormEvent) => {
-  e.preventDefault();
-  
-  if (!selectedTask) return;
+    e.preventDefault();
+    
+    // Add validation - RETURN EARLY if validation fails
+    if (!validateForm()) {
+        return; // Don't proceed if validation fails
+    }
+    
+    if (!selectedTask) return;
 
-  try {
-    router.put(route('admin.staff.tasks.update', selectedTask.id), { // ✅ Correct
-      ...formData,
-      room_id: formData.room_id === 'none' ? null : parseInt(formData.room_id) || null,
-      assigned_to: parseInt(formData.assigned_to),
-      scheduled_date: formData.scheduled_date ? format(formData.scheduled_date, 'yyyy-MM-dd') : null
-    }, {
-      onSuccess: () => {
-        setIsEditDialogOpen(false);
-        setSelectedTask(null);
-        resetForm();
-        toast({
-          title: "Success",
-          description: "Task updated successfully.",
+    try {
+        const submitData = {
+            ...formData,
+            room_id: formData.room_id === 'none' ? null : parseInt(formData.room_id) || null,
+            assigned_to: parseInt(formData.assigned_to),
+            scheduled_at: formData.scheduled_date ? format(formData.scheduled_date, 'yyyy-MM-dd') : null // Changed from scheduled_date to scheduled_at
+        };
+
+        // Remove undefined values
+        Object.keys(submitData).forEach(key => {
+            if (submitData[key as keyof typeof submitData] === undefined) {
+                delete submitData[key as keyof typeof submitData];
+            }
         });
-      }
-    });
-  } catch (error) {
-    console.error('Error updating task:', error);
-  }
+
+        router.put(route('admin.staff.tasks.update', selectedTask.id), submitData, {
+            onSuccess: () => {
+                setIsEditDialogOpen(false);
+                setSelectedTask(null);
+                resetForm();
+                toast({
+                    title: "Success",
+                    description: "Task updated successfully.",
+                });
+            },
+            onError: (errors: any) => {
+                console.log('Validation errors:', errors);
+                toast({
+                    title: "Error",
+                    description: "Failed to update task. Please check your input.",
+                    variant: "destructive",
+                });
+            }
+        });
+    } catch (error) {
+        console.error('Error updating task:', error);
+        toast({
+            title: "Error",
+            description: "An unexpected error occurred.",
+            variant: "destructive",
+        });
+    }
 };
 
 // 3. Fix delete route
@@ -516,44 +566,41 @@ const handleDeleteTask = async (taskId: number) => {
 
 // 4. Add validation check before submit
 const validateForm = () => {
-  if (!formData.title.trim()) {
-    toast({
-      title: "Validation Error",
-      description: "Task title is required.",
-      variant: "destructive",
-    });
-    return false;
-  }
-  
-  if (!formData.type) {
-    toast({
-      title: "Validation Error", 
-      description: "Task type is required.",
-      variant: "destructive",
-    });
-    return false;
-  }
-  
-  if (!formData.assigned_to) {
-    toast({
-      title: "Validation Error",
-      description: "Please assign the task to a staff member.",
-      variant: "destructive",
-    });
-    return false;
-  }
-  
-  if (!formData.scheduled_date) {
-    toast({
-      title: "Validation Error",
-      description: "Scheduled date is required.",
-      variant: "destructive",
-    });
-    return false;
-  }
-  
-  return true;
+    const errors = [];
+    
+    if (!formData.title.trim()) {
+        errors.push("Task title is required.");
+    }
+    
+    if (!formData.type) {
+        errors.push("Task type is required.");
+    }
+    
+    if (!formData.assigned_to) {
+        errors.push("Please assign the task to a staff member.");
+    }
+    
+    if (!formData.scheduled_date) {
+        errors.push("Scheduled date is required.");
+    }
+    
+    if (formData.estimated_duration < 15) {
+        errors.push("Estimated duration must be at least 15 minutes.");
+    }
+    
+    // Show all validation errors at once
+    if (errors.length > 0) {
+        toast({
+            title: "Validation Error",
+            description: errors.join(" "),
+            variant: "destructive",
+        });
+        return false;
+    }
+    
+    return true;
 };
+
 
 const resetForm = () => {
   setFormData({
