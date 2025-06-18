@@ -565,7 +565,7 @@ const removeImageField = (index: number) => {
                     </CardHeader>
                     
                     <CardContent className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
                             <div className="space-y-2">
                                 <Label htmlFor="price" className="flex items-center gap-2">
                                     <DollarSign className="h-4 w-4" />
@@ -598,9 +598,6 @@ const removeImageField = (index: number) => {
                                     required
                                 />
                                 {errors.number && <p className="text-sm text-destructive">{errors.number}</p>}
-                                <p className="text-xs text-muted-foreground">
-                                    Unique identifier for this room (e.g., floor-room like "101" or "A-205")
-                                </p>
                             </div>
 
                             <div className="space-y-2">
