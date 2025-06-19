@@ -386,7 +386,31 @@ interface PageProps {
 
 const AdminTaskAssignment: React.FC = () => {
   let { staff, rooms, tasks, taskTypes, departments } = usePage<PageProps>().props;
-  taskTypes = Array.isArray(taskTypes) && taskTypes.length > 0 ? taskTypes : ['general']; // Provide a default if empty
+  
+  // Fix taskTypes handling - ensure it's always an array
+  const getTaskTypesArray = () => {
+    if (Array.isArray(taskTypes)) {
+      return taskTypes;
+    }
+    if (typeof taskTypes === 'object' && taskTypes !== null) {
+      return Object.keys(taskTypes);
+    }
+    // Fallback to common task types if taskTypes is not available
+    return [
+      'general',
+      'room_cleaning',
+      'maintenance',
+      'repair',
+      'inspection',
+      'cleaning',
+      'guest_service',
+      'security_check',
+      'laundry',
+      'preventive_maintenance'
+    ];
+  };
+  
+  const availableTaskTypes = getTaskTypesArray();
   
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -412,54 +436,58 @@ const AdminTaskAssignment: React.FC = () => {
     estimated_duration: 60,
     location: ''
   });
-const getTaskTypesForRole = (staffId: string) => {
-    if (!staffId) return taskTypes;
+
+  const getTaskTypesForRole = (staffId: string) => {
+    if (!staffId) return availableTaskTypes;
     
     const selectedStaff = staff.find(s => s.id.toString() === staffId);
-    if (!selectedStaff) return taskTypes;
+    if (!selectedStaff) return availableTaskTypes;
     
     // Define task types per role based on your backend logic
     const roleTaskTypes = {
-        'housekeeping': ['room_cleaning', 'cleaning', 'laundry', 'maintenance_request', 'general'],
-        'maintenance': ['maintenance', 'repair', 'inspection', 'preventive_maintenance', 'general'],
-        'front_desk': ['guest_service', 'check_in', 'check_out', 'booking_management', 'general'],
-        'security': ['security_check', 'patrol', 'incident_report', 'access_control', 'general'],
-        'management': taskTypes, // All types available
+      'housekeeping': ['room_cleaning', 'cleaning', 'laundry', 'maintenance_request', 'general'],
+      'maintenance': ['maintenance', 'repair', 'inspection', 'preventive_maintenance', 'general'],
+      'front_desk': ['guest_service', 'check_in', 'check_out', 'booking_management', 'general'],
+      'security': ['security_check', 'patrol', 'incident_report', 'access_control', 'general'],
+      'management': availableTaskTypes, // All types available
     };
     
-    return roleTaskTypes[selectedStaff.role as keyof typeof roleTaskTypes] || taskTypes;
-};
-const getRoleInfo = (staffId: string) => {
+    const roleTypes = roleTaskTypes[selectedStaff.role as keyof typeof roleTaskTypes];
+    // Filter to only include types that exist in the available task types
+    return roleTypes ? roleTypes.filter(type => availableTaskTypes.includes(type)) : availableTaskTypes;
+  };
+
+  const getRoleInfo = (staffId: string) => {
     if (!staffId) return null;
     
     const selectedStaff = staff.find(s => s.id.toString() === staffId);
     if (!selectedStaff) return null;
     
     const roleInfo = {
-        'housekeeping': {
-            description: 'Room cleaning tasks will create room assignments automatically',
-            requiresRoom: ['room_cleaning', 'cleaning'].includes(formData.type),
-            defaultDuration: 45
-        },
-        'maintenance': {
-            description: 'Maintenance tasks will create maintenance requests automatically',
-            requiresRoom: ['maintenance', 'repair', 'inspection'].includes(formData.type),
-            defaultDuration: 60
-        },
-        'front_desk': {
-            description: 'Front desk tasks for guest services and operations',
-            requiresRoom: false,
-            defaultDuration: 30
-        },
-        'security': {
-            description: 'Security and safety related tasks',
-            requiresRoom: false,
-            defaultDuration: 30
-        }
+      'housekeeping': {
+        description: 'Room cleaning tasks will create room assignments automatically',
+        requiresRoom: ['room_cleaning', 'cleaning'].includes(formData.type),
+        defaultDuration: 45
+      },
+      'maintenance': {
+        description: 'Maintenance tasks will create maintenance requests automatically',
+        requiresRoom: ['maintenance', 'repair', 'inspection'].includes(formData.type),
+        defaultDuration: 60
+      },
+      'front_desk': {
+        description: 'Front desk tasks for guest services and operations',
+        requiresRoom: false,
+        defaultDuration: 30
+      },
+      'security': {
+        description: 'Security and safety related tasks',
+        requiresRoom: false,
+        defaultDuration: 30
+      }
     };
     
     return roleInfo[selectedStaff.role as keyof typeof roleInfo] || null;
-};
+  };
 
   const breadcrumbItems: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/admin' },
@@ -489,216 +517,279 @@ const getRoleInfo = (staffId: string) => {
     management: 'bg-green-100 text-green-800'
   };
 
-// Update handleCreateTask to send proper data format
-const handleCreateTask = async (e: React.FormEvent) => {
+  // Update handleCreateTask to send proper data format
+  const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!validateForm()) return;
     
     try {
-        // Prepare submission data to match backend expectations
-        const submissionData = {
-            title: formData.title.trim(),
-            description: formData.description?.trim() || null,
-            type: formData.type,
-            priority: formData.priority,
-            assigned_to: parseInt(formData.assigned_to),
-            room_id: formData.room_id === 'none' || !formData.room_id ? null : parseInt(formData.room_id),
-            scheduled_at: formData.scheduled_date && formData.scheduled_time 
-                ? `${format(formData.scheduled_date, 'yyyy-MM-dd')} ${formData.scheduled_time}`
-                : formData.scheduled_date 
-                    ? format(formData.scheduled_date, 'yyyy-MM-dd')
-                    : null,
-            estimated_duration: formData.estimated_duration || null,
-        };
+      // Prepare submission data to match backend expectations
+      const submissionData = {
+        title: formData.title.trim(),
+        description: formData.description?.trim() || '',
+        type: formData.type,
+        priority: formData.priority,
+        assigned_to: parseInt(formData.assigned_to),
+        room_id: formData.room_id === 'none' || !formData.room_id ? null : parseInt(formData.room_id),
+        scheduled_at: formData.scheduled_date && formData.scheduled_time 
+          ? `${format(formData.scheduled_date, 'yyyy-MM-dd')} ${formData.scheduled_time}:00`
+          : formData.scheduled_date 
+            ? `${format(formData.scheduled_date, 'yyyy-MM-dd')} 09:00:00`
+            : null,
+        estimated_duration: formData.estimated_duration || 60,
+      };
 
-        router.post(route('admin.staff.tasks.store'), submissionData, {
-            onSuccess: () => {
-                setIsCreateDialogOpen(false);
-                resetForm();
-                toast({
-                    title: "Success",
-                    description: "Task created and assigned successfully.",
-                });
-            },
-            onError: (errors: any) => {
-                console.log('Validation errors:', errors);
-                
-                // Handle specific validation errors from backend
-                const errorMessages = Object.values(errors).flat();
-                toast({
-                    title: "Validation Error",
-                    description: errorMessages.join(" "),
-                    variant: "destructive",
-                });
+      console.log('Submitting task data:', submissionData);
+
+      router.post(route('admin.staff.tasks.store'), submissionData, {
+        onSuccess: () => {
+          setIsCreateDialogOpen(false);
+          resetForm();
+          toast({
+            title: "Success",
+            description: "Task created and assigned successfully.",
+          });
+        },
+        onError: (errors: any) => {
+          console.log('Validation errors:', errors);
+          
+          // Handle specific validation errors from backend
+          const errorMessages = [];
+          
+          // Check if errors is an object with field-specific errors
+          if (typeof errors === 'object' && errors !== null) {
+            Object.keys(errors).forEach(field => {
+              if (Array.isArray(errors[field])) {
+                errorMessages.push(...errors[field]);
+              } else if (typeof errors[field] === 'string') {
+                errorMessages.push(errors[field]);
+              }
+            });
+          }
+          
+          // If no specific field errors, check for general error message
+          if (errorMessages.length === 0) {
+            if (errors.error) {
+              errorMessages.push(errors.error);
+            } else if (typeof errors === 'string') {
+              errorMessages.push(errors);
+            } else {
+              errorMessages.push('Failed to assign task. Please try again.');
             }
-        });
-    } catch (error) {
-        console.error('Error creating task:', error);
-        toast({
+          }
+          
+          toast({
             title: "Error",
-            description: "An unexpected error occurred. Please try again.",
+            description: errorMessages.join(" "),
             variant: "destructive",
-        });
+          });
+        }
+      });
+    } catch (error) {
+      console.error('Error creating task:', error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
     }
-};
+  };
 
-// Update handleUpdateTask similarly
-const handleUpdateTask = async (e: React.FormEvent) => {
+  // Update handleUpdateTask similarly
+  const handleUpdateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!validateForm()) return;
     if (!selectedTask) return;
 
     try {
-        const submissionData = {
-            title: formData.title.trim(),
-            description: formData.description?.trim() || null,
-            type: formData.type,
-            priority: formData.priority,
-            assigned_to: parseInt(formData.assigned_to),
-            room_id: formData.room_id === 'none' || !formData.room_id ? null : parseInt(formData.room_id),
-            scheduled_at: formData.scheduled_date && formData.scheduled_time 
-                ? `${format(formData.scheduled_date, 'yyyy-MM-dd')} ${formData.scheduled_time}`
-                : formData.scheduled_date 
-                    ? format(formData.scheduled_date, 'yyyy-MM-dd')
-                    : null,
-            estimated_duration: formData.estimated_duration || null,
-        };
+      const submissionData = {
+        title: formData.title.trim(),
+        description: formData.description?.trim() || '',
+        type: formData.type,
+        priority: formData.priority,
+        assigned_to: parseInt(formData.assigned_to),
+        room_id: formData.room_id === 'none' || !formData.room_id ? null : parseInt(formData.room_id),
+        scheduled_at: formData.scheduled_date && formData.scheduled_time 
+          ? `${format(formData.scheduled_date, 'yyyy-MM-dd')} ${formData.scheduled_time}:00`
+          : formData.scheduled_date 
+            ? `${format(formData.scheduled_date, 'yyyy-MM-dd')} 09:00:00`
+            : null,
+        estimated_duration: formData.estimated_duration || 60,
+      };
 
-        router.put(route('admin.staff.tasks.update', selectedTask.id), submissionData, {
-            onSuccess: () => {
-                setIsEditDialogOpen(false);
-                setSelectedTask(null);
-                resetForm();
-                toast({
-                    title: "Success",
-                    description: "Task updated successfully.",
-                });
-            },
-            onError: (errors: any) => {
-                const errorMessages = Object.values(errors).flat();
-                toast({
-                    title: "Validation Error",
-                    description: errorMessages.join(" "),
-                    variant: "destructive",
-                });
-            }
-        });
-    } catch (error) {
-        console.error('Error updating task:', error);
-        toast({
+      router.put(route('admin.staff.tasks.update', selectedTask.id), submissionData, {
+        onSuccess: () => {
+          setIsEditDialogOpen(false);
+          setSelectedTask(null);
+          resetForm();
+          toast({
+            title: "Success",
+            description: "Task updated successfully.",
+          });
+        },
+        onError: (errors: any) => {
+          const errorMessages = [];
+          
+          if (typeof errors === 'object' && errors !== null) {
+            Object.keys(errors).forEach(field => {
+              if (Array.isArray(errors[field])) {
+                errorMessages.push(...errors[field]);
+              } else if (typeof errors[field] === 'string') {
+                errorMessages.push(errors[field]);
+              }
+            });
+          }
+          
+          if (errorMessages.length === 0) {
+            errorMessages.push('Failed to update task. Please try again.');
+          }
+          
+          toast({
             title: "Error",
-            description: "An unexpected error occurred. Please try again.",
+            description: errorMessages.join(" "),
             variant: "destructive",
-        });
+          });
+        }
+      });
+    } catch (error) {
+      console.error('Error updating task:', error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
     }
-};
+  };
 
-// 3. Fix delete route
-const handleDeleteTask = async (taskId: number) => {
-  if (!confirm('Are you sure you want to delete this task?')) return;
+  // Fix delete route
+  const handleDeleteTask = async (taskId: number) => {
+    if (!confirm('Are you sure you want to delete this task?')) return;
 
-  try {
-    router.delete(route('admin.staff.tasks.destroy', taskId), { // ✅ Correct
-      onSuccess: () => {
-        toast({
-          title: "Success",
-          description: "Task deleted successfully.",
-        });
-      }
-    });
-  } catch (error) {
-    console.error('Error deleting task:', error);
-  }
-};
+    try {
+      router.delete(route('admin.staff.tasks.destroy', taskId), {
+        onSuccess: () => {
+          toast({
+            title: "Success",
+            description: "Task deleted successfully.",
+          });
+        },
+        onError: (errors: any) => {
+          toast({
+            title: "Error",
+            description: "Failed to delete task. Please try again.",
+            variant: "destructive",
+          });
+        }
+      });
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred.",
+        variant: "destructive",
+      });
+    }
+  };
 
-// Update the validateForm function to match backend validation
-const validateForm = () => {
+  // Update the validateForm function to match backend validation
+  const validateForm = () => {
     const errors = [];
     
     if (!formData.title.trim()) {
-        errors.push("Task title is required.");
+      errors.push("Task title is required.");
     }
     
     if (formData.title.length > 255) {
-        errors.push("Task title must not exceed 255 characters.");
+      errors.push("Task title must not exceed 255 characters.");
     }
     
     if (!formData.type) {
-        errors.push("Task type is required.");
+      errors.push("Task type is required.");
+    }
+    
+    // Validate task type exists in available types
+    if (formData.type && !availableTaskTypes.includes(formData.type)) {
+      errors.push("Selected task type is invalid.");
     }
     
     if (!formData.assigned_to) {
-        errors.push("Please assign the task to a staff member.");
+      errors.push("Please assign the task to a staff member.");
     }
     
     if (!formData.priority || !['low', 'medium', 'high', 'urgent'].includes(formData.priority)) {
-        errors.push("Please select a valid priority level.");
+      errors.push("Please select a valid priority level.");
     }
     
     // Validate assigned staff exists
     const assignedStaff = staff.find(s => s.id.toString() === formData.assigned_to);
-    if (!assignedStaff) {
-        errors.push("Selected staff member is invalid.");
+    if (formData.assigned_to && !assignedStaff) {
+      errors.push("Selected staff member is invalid.");
     }
     
     // Validate room exists if provided
     if (formData.room_id && formData.room_id !== 'none') {
-        const roomExists = rooms.find(r => r.id.toString() === formData.room_id);
-        if (!roomExists) {
-            errors.push("Selected room is invalid.");
-        }
+      const roomExists = rooms.find(r => r.id.toString() === formData.room_id);
+      if (!roomExists) {
+        errors.push("Selected room is invalid.");
+      }
     }
     
     // Validate scheduled date
     if (!formData.scheduled_date) {
-        errors.push("Scheduled date is required.");
+      errors.push("Scheduled date is required.");
     } else {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const scheduledDate = new Date(formData.scheduled_date);
-        scheduledDate.setHours(0, 0, 0, 0);
-        
-        if (scheduledDate < today) {
-            errors.push("Scheduled date must be today or in the future.");
-        }
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const scheduledDate = new Date(formData.scheduled_date);
+      scheduledDate.setHours(0, 0, 0, 0);
+      
+      if (scheduledDate < today) {
+        errors.push("Scheduled date must be today or in the future.");
+      }
     }
     
     // Validate estimated duration
     if (formData.estimated_duration && formData.estimated_duration < 15) {
-        errors.push("Estimated duration must be at least 15 minutes.");
+      errors.push("Estimated duration must be at least 15 minutes.");
+    }
+    
+    // Check role-specific requirements
+    const roleInfo = getRoleInfo(formData.assigned_to);
+    if (roleInfo && roleInfo.requiresRoom && (!formData.room_id || formData.room_id === 'none')) {
+      errors.push("Room selection is required for this task type and staff role.");
     }
     
     // Show all validation errors at once
     if (errors.length > 0) {
-        toast({
-            title: "Validation Error",
-            description: errors.join(" "),
-            variant: "destructive",
-        });
-        return false;
+      toast({
+        title: "Validation Error",
+        description: errors.join(" "),
+        variant: "destructive",
+      });
+      return false;
     }
     
     return true;
-};
+  };
 
-const resetForm = () => {
+  const resetForm = () => {
     setFormData({
-        title: '',
-        description: '',
-        type: '',
-        priority: 'medium',
-        assigned_to: '',
-        room_id: 'none',
-        scheduled_date: undefined,
-        scheduled_time: '',
-        estimated_duration: 60,
-        location: ''
+      title: '',
+      description: '',
+      type: '',
+      priority: 'medium',
+      assigned_to: '',
+      room_id: '',
+      scheduled_date: undefined,
+      scheduled_time: '',
+      estimated_duration: 60,
+      location: ''
     });
-};
+  };
 
-const openEditDialog = (task: Task) => {
+  const openEditDialog = (task: Task) => {
     setSelectedTask(task);
     
     // Parse scheduled_at if it contains both date and time
@@ -706,27 +797,32 @@ const openEditDialog = (task: Task) => {
     let scheduledTime = '';
     
     if (task.scheduled_date) {
-        scheduledDate = new Date(task.scheduled_date);
-        // If the backend returns datetime string, extract time
-        if (task.scheduled_time) {
-            scheduledTime = task.scheduled_time;
-        }
+      scheduledDate = new Date(task.scheduled_date);
+      // If the backend returns datetime string, extract time
+      if (task.scheduled_time) {
+        scheduledTime = task.scheduled_time;
+      } else if (task.scheduled_date.includes(' ')) {
+        // If scheduled_date contains time, extract it
+        const [datePart, timePart] = task.scheduled_date.split(' ');
+        scheduledDate = new Date(datePart);
+        scheduledTime = timePart ? timePart.substring(0, 5) : ''; // Get HH:MM format
+      }
     }
     
     setFormData({
-        title: task.title,
-        description: task.description || '',
-        type: task.type,
-        priority: task.priority,
-        assigned_to: task.assigned_to.toString(),
-        room_id: task.room_id?.toString() || 'none',
-        scheduled_date: scheduledDate,
-        scheduled_time: scheduledTime,
-        estimated_duration: task.estimated_duration || 60,
-        location: task.location || ''
+      title: task.title,
+      description: task.description || '',
+      type: task.type,
+      priority: task.priority,
+      assigned_to: task.assigned_to.toString(),
+      room_id: task.room_id?.toString() || '',
+      scheduled_date: scheduledDate,
+      scheduled_time: scheduledTime,
+      estimated_duration: task.estimated_duration || 60,
+      location: task.location || ''
     });
     setIsEditDialogOpen(true);
-};
+  };
 
   const filteredTasks = tasks.filter(task => {
     const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -759,48 +855,49 @@ const openEditDialog = (task: Task) => {
             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
             placeholder="Enter task title"
             required
+            maxLength={255}
           />
         </div>
         
-{(() => {
-  const availableTypes = getTaskTypesForRole(formData.assigned_to);
-  const roleInfo = getRoleInfo(formData.assigned_to);
-  return (
-    <div className="space-y-2">
-      <Label htmlFor="type">Task Type *</Label>
-      <Select 
-        value={formData.type} 
-        onValueChange={(value) => {
-          setFormData({ ...formData, type: value });
-          // Auto-set default duration based on role and type
-          if (roleInfo && !formData.estimated_duration) {
-            setFormData(prev => ({ 
-              ...prev, 
-              type: value, 
-              estimated_duration: roleInfo.defaultDuration 
-            }));
-          }
-        }}
-      >
-        <SelectTrigger>
-          <SelectValue placeholder="Select task type" />
-        </SelectTrigger>
-        <SelectContent>
-          {availableTypes.map((type) => (
-            <SelectItem key={type} value={type}>
-              {type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      {roleInfo && (
-        <p className="text-xs text-muted-foreground">
-          {roleInfo.description}
-        </p>
-      )}
-    </div>
-  );
-})()}
+        {(() => {
+          const availableTypes = getTaskTypesForRole(formData.assigned_to);
+          const roleInfo = getRoleInfo(formData.assigned_to);
+          return (
+            <div className="space-y-2">
+              <Label htmlFor="type">Task Type *</Label>
+              <Select
+                value={formData.type}
+                onValueChange={(value) => {
+                  setFormData({ ...formData, type: value });
+                  // Auto-set default duration based on role and type
+                  if (roleInfo && !formData.estimated_duration) {
+                    setFormData(prev => ({
+                      ...prev,
+                      type: value,
+                      estimated_duration: roleInfo.defaultDuration
+                    }));
+                  }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select task type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableTypes.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {roleInfo && (
+                <p className="text-xs text-muted-foreground">
+                  {roleInfo.description}
+                </p>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       <div className="col-span-2 space-y-2">
@@ -817,7 +914,17 @@ const openEditDialog = (task: Task) => {
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="assigned_to">Assign To *</Label>
-          <Select value={formData.assigned_to} onValueChange={(value) => setFormData({ ...formData, assigned_to: value })}>
+          <Select
+            value={formData.assigned_to}
+            onValueChange={(value) => {
+              setFormData({
+                ...formData,
+                assigned_to: value,
+                // Reset type if the new staff doesn't have the current type
+                type: getTaskTypesForRole(value).includes(formData.type) ? formData.type : ''
+              });
+            }}
+          >
             <SelectTrigger>
               <SelectValue placeholder="Select staff member" />
             </SelectTrigger>
@@ -826,8 +933,11 @@ const openEditDialog = (task: Task) => {
                 <SelectItem key={member.id} value={member.id.toString()}>
                   <div className="flex items-center gap-2">
                     <span>{member.name}</span>
-                    <Badge variant="outline" className={roleColors[member.role as keyof typeof roleColors]}>
-                      {member.role.replace('_', ' ')}
+                    <Badge
+                      variant="outline"
+                      className={roleColors[member.role as keyof typeof roleColors] || 'bg-gray-100 text-gray-800'}
+                    >
+                      {member.role.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                     </Badge>
                   </div>
                 </SelectItem>
@@ -889,64 +999,64 @@ const openEditDialog = (task: Task) => {
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-{(() => {
-  const roleInfo = getRoleInfo(formData.assigned_to);
-  const isRoomRequired = roleInfo ? roleInfo.requiresRoom : false;
-  return (
-    <div className="space-y-2">
-      <Label htmlFor="room_id">
-        Room {isRoomRequired ? '*' : '(Optional)'}
-      </Label>
-      <Select 
-        value={formData.room_id} 
-        onValueChange={(value) => setFormData({ ...formData, room_id: value })}
-      >
-        <SelectTrigger>
-          <SelectValue placeholder="Select room" />
-        </SelectTrigger>
-        <SelectContent>
-          {!isRoomRequired && (
-            <SelectItem value="none">No specific room</SelectItem>
-          )}
-          {rooms.map((room) => (
-            <SelectItem key={room.id} value={room.id.toString()}>
-              Room {room.number} ({room.type})
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      {isRoomRequired && (
-        <p className="text-xs text-red-600">
-          Room selection is required for this task type
-        </p>
-      )}
-    </div>
-  );
-})()}
+        {(() => {
+          const roleInfo = getRoleInfo(formData.assigned_to);
+          const isRoomRequired = roleInfo ? roleInfo.requiresRoom : false;
+          return (
+            <div className="space-y-2">
+              <Label htmlFor="room_id">
+                Room {isRoomRequired ? '*' : '(Optional)'}
+              </Label>
+              <Select 
+                value={formData.room_id} 
+                onValueChange={(value) => setFormData({ ...formData, room_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select room" />
+                </SelectTrigger>
+                <SelectContent>
+                  {!isRoomRequired && (
+                    <SelectItem value="none">No specific room</SelectItem>
+                  )}
+                  {rooms.map((room) => (
+                    <SelectItem key={room.id} value={room.id.toString()}>
+                      Room {room.number} ({room.type})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {isRoomRequired && (
+                <p className="text-xs text-red-600">
+                  Room selection is required for this task type
+                </p>
+              )}
+            </div>
+          );
+        })()}
 
-      {(() => {
-        const roleInfo = getRoleInfo(formData.assigned_to);
-        return (
-          <div className="space-y-2">
-            <Label htmlFor="estimated_duration">Estimated Duration (minutes)</Label>
-            <Input
-              id="estimated_duration"
-              type="number"
-              min="15"
-              step="15"
-              value={formData.estimated_duration}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  estimated_duration:
-                    parseInt(e.target.value) || (roleInfo?.defaultDuration ?? 60),
-                })
-              }
-              placeholder={roleInfo ? `Default: ${roleInfo.defaultDuration} min` : "60"}
-            />
-          </div>
-        );
-      })()}
+        {(() => {
+          const roleInfo = getRoleInfo(formData.assigned_to);
+          return (
+            <div className="space-y-2">
+              <Label htmlFor="estimated_duration">Estimated Duration (minutes)</Label>
+              <Input
+                id="estimated_duration"
+                type="number"
+                min="15"
+                step="15"
+                value={formData.estimated_duration}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    estimated_duration:
+                      parseInt(e.target.value) || (roleInfo?.defaultDuration ?? 60),
+                  })
+                }
+                placeholder={roleInfo ? `Default: ${roleInfo.defaultDuration} min` : "60"}
+              />
+            </div>
+          );
+        })()}
       </div>
 
       <div className="space-y-2">
