@@ -1,4 +1,4 @@
-import React, { useState,useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, usePage, router } from '@inertiajs/react';
@@ -86,6 +86,7 @@ const TabsContent: React.FC<TabsContentProps> = ({ value, className, children })
     if (ctx.value !== value) return null;
     return <div className={className}>{children}</div>;
 };
+
 interface PopoverProps {
     children: React.ReactNode;
 }
@@ -126,9 +127,7 @@ export const PopoverTrigger: React.FC<PopoverTriggerProps> = ({ children, asChil
     if (asChild && React.isValidElement(children)) {
         return React.cloneElement(children as React.ReactElement<any>, {
             ref: (node: HTMLButtonElement) => {
-                // Assign to triggerRef.current
                 (triggerRef as React.MutableRefObject<HTMLButtonElement | null>).current = node;
-                // If the child has its own ref, call it as well
                 const childRef = (children as React.ReactElement<any>).props.ref;
                 if (typeof childRef === 'function') {
                     childRef(node);
@@ -199,6 +198,7 @@ export const PopoverContent: React.FC<PopoverContentProps> = ({ children, classN
         </div>
     );
 };
+
 export interface CalendarProps {
     selected?: Date;
     onSelect?: (date: Date) => void;
@@ -330,7 +330,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
         <textarea
             ref={ref}
             className={cn(
-                "border border-input rounded px-3 py-2 bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
+                "border border-input rounded px-3 py-2 bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent min-h-[60px] resize-vertical",
                 className
             )}
             {...props}
@@ -339,6 +339,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
 );
 
 Textarea.displayName = 'Textarea';
+
 interface Staff {
   id: number;
   name: string;
@@ -381,13 +382,12 @@ interface PageProps {
   tasks: Task[];
   taskTypes: string[];
   departments: string[];
-  [key: string]: unknown; // Add index signature for Inertia compatibility
+  [key: string]: unknown;
 }
 
 const AdminTaskAssignment: React.FC = () => {
-  let { staff, rooms, tasks, taskTypes, departments } = usePage<PageProps>().props;
+  const { staff, rooms, tasks, taskTypes, departments } = usePage<PageProps>().props;
   
-  // Fix taskTypes handling - ensure it's always an array
   const getTaskTypesArray = () => {
     if (Array.isArray(taskTypes)) {
       return taskTypes;
@@ -395,7 +395,6 @@ const AdminTaskAssignment: React.FC = () => {
     if (typeof taskTypes === 'object' && taskTypes !== null) {
       return Object.keys(taskTypes);
     }
-    // Fallback to common task types if taskTypes is not available
     return [
       'general',
       'room_cleaning',
@@ -423,7 +422,7 @@ const AdminTaskAssignment: React.FC = () => {
   
   const { toast } = useToast();
 
-  // Form state
+  // Form state - Fixed initialization
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -431,7 +430,7 @@ const AdminTaskAssignment: React.FC = () => {
     priority: 'medium' as 'low' | 'medium' | 'high' | 'urgent',
     assigned_to: '',
     room_id: '',
-    scheduled_date: undefined as Date | undefined,
+    scheduled_date: new Date(), // Initialize with today's date
     scheduled_time: '',
     estimated_duration: 60,
     location: ''
@@ -443,17 +442,15 @@ const AdminTaskAssignment: React.FC = () => {
     const selectedStaff = staff.find(s => s.id.toString() === staffId);
     if (!selectedStaff) return availableTaskTypes;
     
-    // Define task types per role based on your backend logic
     const roleTaskTypes = {
       'housekeeping': ['room_cleaning', 'cleaning', 'laundry', 'maintenance_request', 'general'],
       'maintenance': ['maintenance', 'repair', 'inspection', 'preventive_maintenance', 'general'],
       'front_desk': ['guest_service', 'check_in', 'check_out', 'booking_management', 'general'],
       'security': ['security_check', 'patrol', 'incident_report', 'access_control', 'general'],
-      'management': availableTaskTypes, // All types available
+      'management': availableTaskTypes,
     };
     
     const roleTypes = roleTaskTypes[selectedStaff.role as keyof typeof roleTaskTypes];
-    // Filter to only include types that exist in the available task types
     return roleTypes ? roleTypes.filter(type => availableTaskTypes.includes(type)) : availableTaskTypes;
   };
 
@@ -517,14 +514,87 @@ const AdminTaskAssignment: React.FC = () => {
     management: 'bg-green-100 text-green-800'
   };
 
-  // Update handleCreateTask to send proper data format
+  // Fixed form validation
+  const validateForm = () => {
+    const errors = [];
+    
+    if (!formData.title || formData.title.trim().length === 0) {
+      errors.push("Task title is required.");
+    }
+    
+    if (formData.title && formData.title.length > 255) {
+      errors.push("Task title must not exceed 255 characters.");
+    }
+    
+    if (!formData.type) {
+      errors.push("Task type is required.");
+    }
+    
+    if (formData.type && !availableTaskTypes.includes(formData.type)) {
+      errors.push("Selected task type is invalid.");
+    }
+    
+    if (!formData.assigned_to) {
+      errors.push("Please assign the task to a staff member.");
+    }
+    
+    if (!formData.priority || !['low', 'medium', 'high', 'urgent'].includes(formData.priority)) {
+      errors.push("Please select a valid priority level.");
+    }
+    
+    const assignedStaff = staff.find(s => s.id.toString() === formData.assigned_to);
+    if (formData.assigned_to && !assignedStaff) {
+      errors.push("Selected staff member is invalid.");
+    }
+    
+    if (formData.room_id && formData.room_id !== 'none') {
+      const roomExists = rooms.find(r => r.id.toString() === formData.room_id);
+      if (!roomExists) {
+        errors.push("Selected room is invalid.");
+      }
+    }
+    
+    if (!formData.scheduled_date) {
+      errors.push("Scheduled date is required.");
+    } else {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const scheduledDate = new Date(formData.scheduled_date);
+      scheduledDate.setHours(0, 0, 0, 0);
+      
+      if (scheduledDate < today) {
+        errors.push("Scheduled date must be today or in the future.");
+      }
+    }
+    
+    if (formData.estimated_duration && formData.estimated_duration < 15) {
+      errors.push("Estimated duration must be at least 15 minutes.");
+    }
+    
+    const roleInfo = getRoleInfo(formData.assigned_to);
+    if (roleInfo && roleInfo.requiresRoom && (!formData.room_id || formData.room_id === 'none')) {
+      errors.push("Room selection is required for this task type and staff role.");
+    }
+    
+    if (errors.length > 0) {
+      toast({
+        title: "Validation Error",
+        description: errors.join(" "),
+        variant: "destructive",
+      });
+      return false;
+    }
+    
+    return true;
+  };
+
+  // Fixed form submission
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!validateForm()) return;
     
     try {
-      // Prepare submission data to match backend expectations
       const submissionData = {
         title: formData.title.trim(),
         description: formData.description?.trim() || '',
@@ -542,50 +612,69 @@ const AdminTaskAssignment: React.FC = () => {
 
       console.log('Submitting task data:', submissionData);
 
-      router.post(route('admin.staff.tasks.store'), submissionData, {
-        onSuccess: () => {
-          setIsCreateDialogOpen(false);
-          resetForm();
-          toast({
-            title: "Success",
-            description: "Task created and assigned successfully.",
-          });
-        },
-        onError: (errors: any) => {
-          console.log('Validation errors:', errors);
-          
-          // Handle specific validation errors from backend
-          const errorMessages = [];
-          
-          // Check if errors is an object with field-specific errors
-          if (typeof errors === 'object' && errors !== null) {
-            Object.keys(errors).forEach(field => {
-              if (Array.isArray(errors[field])) {
-                errorMessages.push(...errors[field]);
-              } else if (typeof errors[field] === 'string') {
-                errorMessages.push(errors[field]);
+      // Check if route function exists
+      if (typeof route === 'function') {
+        router.post(route('admin.staff.tasks.store'), submissionData, {
+          onSuccess: () => {
+            setIsCreateDialogOpen(false);
+            resetForm();
+            toast({
+              title: "Success",
+              description: "Task created and assigned successfully.",
+            });
+          },
+          onError: (errors: any) => {
+            console.log('Validation errors:', errors);
+            
+            const errorMessages = [];
+            
+            if (typeof errors === 'object' && errors !== null) {
+              Object.keys(errors).forEach(field => {
+                if (Array.isArray(errors[field])) {
+                  errorMessages.push(...errors[field]);
+                } else if (typeof errors[field] === 'string') {
+                  errorMessages.push(errors[field]);
+                }
+              });
+            }
+            
+            if (errorMessages.length === 0) {
+              if (errors.error) {
+                errorMessages.push(errors.error);
+              } else if (typeof errors === 'string') {
+                errorMessages.push(errors);
+              } else {
+                errorMessages.push('Failed to assign task. Please try again.');
               }
+            }
+            
+            toast({
+              title: "Error",
+              description: errorMessages.join(" "),
+              variant: "destructive",
             });
           }
-          
-          // If no specific field errors, check for general error message
-          if (errorMessages.length === 0) {
-            if (errors.error) {
-              errorMessages.push(errors.error);
-            } else if (typeof errors === 'string') {
-              errorMessages.push(errors);
-            } else {
-              errorMessages.push('Failed to assign task. Please try again.');
-            }
+        });
+      } else {
+        // Fallback if route helper is not available
+        router.post('/admin/staff/tasks', submissionData, {
+          onSuccess: () => {
+            setIsCreateDialogOpen(false);
+            resetForm();
+            toast({
+              title: "Success",
+              description: "Task created and assigned successfully.",
+            });
+          },
+          onError: (errors: any) => {
+            toast({
+              title: "Error",
+              description: "Failed to assign task. Please try again.",
+              variant: "destructive",
+            });
           }
-          
-          toast({
-            title: "Error",
-            description: errorMessages.join(" "),
-            variant: "destructive",
-          });
-        }
-      });
+        });
+      }
     } catch (error) {
       console.error('Error creating task:', error);
       toast({
@@ -596,7 +685,6 @@ const AdminTaskAssignment: React.FC = () => {
     }
   };
 
-  // Update handleUpdateTask similarly
   const handleUpdateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -619,40 +707,61 @@ const AdminTaskAssignment: React.FC = () => {
         estimated_duration: formData.estimated_duration || 60,
       };
 
-      router.put(route('admin.staff.tasks.update', selectedTask.id), submissionData, {
-        onSuccess: () => {
-          setIsEditDialogOpen(false);
-          setSelectedTask(null);
-          resetForm();
-          toast({
-            title: "Success",
-            description: "Task updated successfully.",
-          });
-        },
-        onError: (errors: any) => {
-          const errorMessages = [];
-          
-          if (typeof errors === 'object' && errors !== null) {
-            Object.keys(errors).forEach(field => {
-              if (Array.isArray(errors[field])) {
-                errorMessages.push(...errors[field]);
-              } else if (typeof errors[field] === 'string') {
-                errorMessages.push(errors[field]);
-              }
+      if (typeof route === 'function') {
+        router.put(route('admin.staff.tasks.update', selectedTask.id), submissionData, {
+          onSuccess: () => {
+            setIsEditDialogOpen(false);
+            setSelectedTask(null);
+            resetForm();
+            toast({
+              title: "Success",
+              description: "Task updated successfully.",
+            });
+          },
+          onError: (errors: any) => {
+            const errorMessages = [];
+            
+            if (typeof errors === 'object' && errors !== null) {
+              Object.keys(errors).forEach(field => {
+                if (Array.isArray(errors[field])) {
+                  errorMessages.push(...errors[field]);
+                } else if (typeof errors[field] === 'string') {
+                  errorMessages.push(errors[field]);
+                }
+              });
+            }
+            
+            if (errorMessages.length === 0) {
+              errorMessages.push('Failed to update task. Please try again.');
+            }
+            
+            toast({
+              title: "Error",
+              description: errorMessages.join(" "),
+              variant: "destructive",
             });
           }
-          
-          if (errorMessages.length === 0) {
-            errorMessages.push('Failed to update task. Please try again.');
+        });
+      } else {
+        router.put(`/admin/staff/tasks/${selectedTask.id}`, submissionData, {
+          onSuccess: () => {
+            setIsEditDialogOpen(false);
+            setSelectedTask(null);
+            resetForm();
+            toast({
+              title: "Success",
+              description: "Task updated successfully.",
+            });
+          },
+          onError: () => {
+            toast({
+              title: "Error",
+              description: "Failed to update task. Please try again.",
+              variant: "destructive",
+            });
           }
-          
-          toast({
-            title: "Error",
-            description: errorMessages.join(" "),
-            variant: "destructive",
-          });
-        }
-      });
+        });
+      }
     } catch (error) {
       console.error('Error updating task:', error);
       toast({
@@ -663,26 +772,43 @@ const AdminTaskAssignment: React.FC = () => {
     }
   };
 
-  // Fix delete route
   const handleDeleteTask = async (taskId: number) => {
     if (!confirm('Are you sure you want to delete this task?')) return;
 
     try {
-      router.delete(route('admin.staff.tasks.destroy', taskId), {
-        onSuccess: () => {
-          toast({
-            title: "Success",
-            description: "Task deleted successfully.",
-          });
-        },
-        onError: (errors: any) => {
-          toast({
-            title: "Error",
-            description: "Failed to delete task. Please try again.",
-            variant: "destructive",
-          });
-        }
-      });
+      if (typeof route === 'function') {
+        router.delete(route('admin.staff.tasks.destroy', taskId), {
+          onSuccess: () => {
+            toast({
+              title: "Success",
+              description: "Task deleted successfully.",
+            });
+          },
+          onError: () => {
+            toast({
+              title: "Error",
+              description: "Failed to delete task. Please try again.",
+              variant: "destructive",
+            });
+          }
+        });
+      } else {
+        router.delete(`/admin/staff/tasks/${taskId}`, {
+          onSuccess: () => {
+            toast({
+              title: "Success",
+              description: "Task deleted successfully.",
+            });
+          },
+          onError: () => {
+            toast({
+              title: "Error",
+              description: "Failed to delete task. Please try again.",
+              variant: "destructive",
+            });
+          }
+        });
+      }
     } catch (error) {
       console.error('Error deleting task:', error);
       toast({
@@ -693,87 +819,7 @@ const AdminTaskAssignment: React.FC = () => {
     }
   };
 
-  // Update the validateForm function to match backend validation
-  const validateForm = () => {
-    const errors = [];
-    
-    if (!formData.title.trim()) {
-      errors.push("Task title is required.");
-    }
-    
-    if (formData.title.length > 255) {
-      errors.push("Task title must not exceed 255 characters.");
-    }
-    
-    if (!formData.type) {
-      errors.push("Task type is required.");
-    }
-    
-    // Validate task type exists in available types
-    if (formData.type && !availableTaskTypes.includes(formData.type)) {
-      errors.push("Selected task type is invalid.");
-    }
-    
-    if (!formData.assigned_to) {
-      errors.push("Please assign the task to a staff member.");
-    }
-    
-    if (!formData.priority || !['low', 'medium', 'high', 'urgent'].includes(formData.priority)) {
-      errors.push("Please select a valid priority level.");
-    }
-    
-    // Validate assigned staff exists
-    const assignedStaff = staff.find(s => s.id.toString() === formData.assigned_to);
-    if (formData.assigned_to && !assignedStaff) {
-      errors.push("Selected staff member is invalid.");
-    }
-    
-    // Validate room exists if provided
-    if (formData.room_id && formData.room_id !== 'none') {
-      const roomExists = rooms.find(r => r.id.toString() === formData.room_id);
-      if (!roomExists) {
-        errors.push("Selected room is invalid.");
-      }
-    }
-    
-    // Validate scheduled date
-    if (!formData.scheduled_date) {
-      errors.push("Scheduled date is required.");
-    } else {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const scheduledDate = new Date(formData.scheduled_date);
-      scheduledDate.setHours(0, 0, 0, 0);
-      
-      if (scheduledDate < today) {
-        errors.push("Scheduled date must be today or in the future.");
-      }
-    }
-    
-    // Validate estimated duration
-    if (formData.estimated_duration && formData.estimated_duration < 15) {
-      errors.push("Estimated duration must be at least 15 minutes.");
-    }
-    
-    // Check role-specific requirements
-    const roleInfo = getRoleInfo(formData.assigned_to);
-    if (roleInfo && roleInfo.requiresRoom && (!formData.room_id || formData.room_id === 'none')) {
-      errors.push("Room selection is required for this task type and staff role.");
-    }
-    
-    // Show all validation errors at once
-    if (errors.length > 0) {
-      toast({
-        title: "Validation Error",
-        description: errors.join(" "),
-        variant: "destructive",
-      });
-      return false;
-    }
-    
-    return true;
-  };
-
+  // Fixed form reset
   const resetForm = () => {
     setFormData({
       title: '',
@@ -782,7 +828,7 @@ const AdminTaskAssignment: React.FC = () => {
       priority: 'medium',
       assigned_to: '',
       room_id: '',
-      scheduled_date: undefined,
+      scheduled_date: new Date(), // Reset to today
       scheduled_time: '',
       estimated_duration: 60,
       location: ''
@@ -792,20 +838,17 @@ const AdminTaskAssignment: React.FC = () => {
   const openEditDialog = (task: Task) => {
     setSelectedTask(task);
     
-    // Parse scheduled_at if it contains both date and time
-    let scheduledDate: Date | undefined;
+    let scheduledDate: Date = new Date();
     let scheduledTime = '';
     
     if (task.scheduled_date) {
       scheduledDate = new Date(task.scheduled_date);
-      // If the backend returns datetime string, extract time
       if (task.scheduled_time) {
         scheduledTime = task.scheduled_time;
       } else if (task.scheduled_date.includes(' ')) {
-        // If scheduled_date contains time, extract it
         const [datePart, timePart] = task.scheduled_date.split(' ');
         scheduledDate = new Date(datePart);
-        scheduledTime = timePart ? timePart.substring(0, 5) : ''; // Get HH:MM format
+        scheduledTime = timePart ? timePart.substring(0, 5) : '';
       }
     }
     
@@ -824,7 +867,7 @@ const AdminTaskAssignment: React.FC = () => {
     setIsEditDialogOpen(true);
   };
 
-  const filteredTasks = tasks.filter(task => {
+  const filteredTasks = Array.isArray(tasks) ? tasks.filter(task => {
     const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          task.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          task.assigned_staff?.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -834,257 +877,263 @@ const AdminTaskAssignment: React.FC = () => {
     const matchesPriority = filterPriority === 'all' || task.priority === filterPriority;
 
     return matchesSearch && matchesDepartment && matchesStatus && matchesPriority;
-  });
+  }) : [];
 
   const getTasksByStatus = (status: string) => {
     return filteredTasks.filter(task => task.status === status);
   };
 
+  // Fixed TaskForm component with proper form handling
   const TaskForm = ({ onSubmit, submitText, isEdit = false }: { 
     onSubmit: (e: React.FormEvent) => void; 
     submitText: string;
     isEdit?: boolean;
-  }) => (
-    <form onSubmit={onSubmit} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="title">Task Title *</Label>
-          <Input
-            id="title"
-            value={formData.title}
-            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-            placeholder="Enter task title"
-            required
-            maxLength={255}
-          />
-        </div>
-        
-        {(() => {
-          const availableTypes = getTaskTypesForRole(formData.assigned_to);
-          const roleInfo = getRoleInfo(formData.assigned_to);
-          return (
-            <div className="space-y-2">
-              <Label htmlFor="type">Task Type *</Label>
-              <Select
-                value={formData.type}
-                onValueChange={(value) => {
-                  setFormData({ ...formData, type: value });
-                  // Auto-set default duration based on role and type
-                  if (roleInfo && !formData.estimated_duration) {
-                    setFormData(prev => ({
-                      ...prev,
-                      type: value,
-                      estimated_duration: roleInfo.defaultDuration
-                    }));
-                  }
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select task type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableTypes.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {roleInfo && (
-                <p className="text-xs text-muted-foreground">
-                  {roleInfo.description}
-                </p>
-              )}
-            </div>
-          );
-        })()}
-      </div>
+  }) => {
+    // Handle form field changes properly
+    const handleFieldChange = (field: string, value: any) => {
+      setFormData(prev => ({
+        ...prev,
+        [field]: value
+      }));
+    };
 
-      <div className="col-span-2 space-y-2">
-        <Label htmlFor="description">Description</Label>
-        <Textarea
-          id="description"
-          value={formData.description}
-          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-          placeholder="Enter task description"
-          rows={3}
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="assigned_to">Assign To *</Label>
-          <Select
-            value={formData.assigned_to}
-            onValueChange={(value) => {
-              setFormData({
-                ...formData,
-                assigned_to: value,
-                // Reset type if the new staff doesn't have the current type
-                type: getTaskTypesForRole(value).includes(formData.type) ? formData.type : ''
-              });
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select staff member" />
-            </SelectTrigger>
-            <SelectContent>
-              {staff.map((member) => (
-                <SelectItem key={member.id} value={member.id.toString()}>
-                  <div className="flex items-center gap-2">
-                    <span>{member.name}</span>
-                    <Badge
-                      variant="outline"
-                      className={roleColors[member.role as keyof typeof roleColors] || 'bg-gray-100 text-gray-800'}
-                    >
-                      {member.role.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                    </Badge>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="priority">Priority *</Label>
-          <Select value={formData.priority} onValueChange={(value: 'low' | 'medium' | 'high' | 'urgent') => setFormData({ ...formData, priority: value })}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="low">Low</SelectItem>
-              <SelectItem value="medium">Medium</SelectItem>
-              <SelectItem value="high">High</SelectItem>
-              <SelectItem value="urgent">Urgent</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>Scheduled Date *</Label>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className={cn(
-                  "w-full justify-start text-left font-normal",
-                  !formData.scheduled_date && "text-muted-foreground"
+    return (
+      <form onSubmit={onSubmit} className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="title">Task Title *</Label>
+            <Input
+              id="title"
+              value={formData.title}
+              onChange={(e) => handleFieldChange('title', e.target.value)}
+              placeholder="Enter task title"
+              required
+              maxLength={255}
+            />
+          </div>
+          
+          {(() => {
+            const availableTypes = getTaskTypesForRole(formData.assigned_to);
+            const roleInfo = getRoleInfo(formData.assigned_to);
+            return (
+              <div className="space-y-2">
+                <Label htmlFor="type">Task Type *</Label>
+                <Select
+                  value={formData.type}
+                  onValueChange={(value) => {
+                    handleFieldChange('type', value);
+                    // Auto-set default duration based on role and type
+                    if (roleInfo && !formData.estimated_duration) {
+                      handleFieldChange('estimated_duration', roleInfo.defaultDuration);
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select task type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableTypes.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {roleInfo && (
+                  <p className="text-xs text-muted-foreground">
+                    {roleInfo.description}
+                  </p>
                 )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {formData.scheduled_date ? format(formData.scheduled_date, "PPP") : "Pick a date"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0">
-              <Calendar
-                selected={formData.scheduled_date}
-                onSelect={(date) => setFormData({ ...formData, scheduled_date: date })}
-              />
-            </PopoverContent>
-          </Popover>
+              </div>
+            );
+          })()}
+        </div>
+
+        <div className="col-span-2 space-y-2">
+          <Label htmlFor="description">Description</Label>
+          <Textarea
+            id="description"
+            value={formData.description}
+            onChange={(e) => handleFieldChange('description', e.target.value)}
+            placeholder="Enter task description"
+            rows={3}
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="assigned_to">Assign To *</Label>
+            <Select
+              value={formData.assigned_to}
+              onValueChange={(value) => {
+                handleFieldChange('assigned_to', value);
+                // Reset type if the new staff doesn't have the current type
+                if (!getTaskTypesForRole(value).includes(formData.type)) {
+                  handleFieldChange('type', '');
+                }
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select staff member" />
+              </SelectTrigger>
+              <SelectContent>
+                {staff.map((member) => (
+                  <SelectItem key={member.id} value={member.id.toString()}>
+                    <div className="flex items-center gap-2">
+                      <span>{member.name}</span>
+                      <Badge
+                        variant="outline"
+                        className={roleColors[member.role as keyof typeof roleColors] || 'bg-gray-100 text-gray-800'}
+                      >
+                        {member.role.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                      </Badge>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="priority">Priority *</Label>
+            <Select 
+              value={formData.priority} 
+              onValueChange={(value: 'low' | 'medium' | 'high' | 'urgent') => handleFieldChange('priority', value)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="low">Low</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="high">High</SelectItem>
+                <SelectItem value="urgent">Urgent</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Scheduled Date *</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !formData.scheduled_date && "text-muted-foreground"
+                  )}
+                  type="button"
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {formData.scheduled_date ? format(formData.scheduled_date, "PPP") : "Pick a date"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0">
+                <Calendar
+                  selected={formData.scheduled_date}
+                  onSelect={(date) => date && handleFieldChange('scheduled_date', date)}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="scheduled_time">Scheduled Time</Label>
+            <Input
+              id="scheduled_time"
+              type="time"
+              value={formData.scheduled_time}
+              onChange={(e) => handleFieldChange('scheduled_time', e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          {(() => {
+            const roleInfo = getRoleInfo(formData.assigned_to);
+            const isRoomRequired = roleInfo ? roleInfo.requiresRoom : false;
+            return (
+              <div className="space-y-2">
+                <Label htmlFor="room_id">
+                  Room {isRoomRequired ? '*' : '(Optional)'}
+                </Label>
+                <Select 
+                  value={formData.room_id} 
+                  onValueChange={(value) => handleFieldChange('room_id', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select room" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {!isRoomRequired && (
+                      <SelectItem value="none">No specific room</SelectItem>
+                    )}
+                    {rooms.map((room) => (
+                      <SelectItem key={room.id} value={room.id.toString()}>
+                        Room {room.number} ({room.type})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {isRoomRequired && (
+                  <p className="text-xs text-red-600">
+                    Room selection is required for this task type
+                  </p>
+                )}
+              </div>
+            );
+          })()}
+
+          {(() => {
+            const roleInfo = getRoleInfo(formData.assigned_to);
+            return (
+              <div className="space-y-2">
+                <Label htmlFor="estimated_duration">Estimated Duration (minutes)</Label>
+                <Input
+                  id="estimated_duration"
+                  type="number"
+                  min="15"
+                  step="15"
+                  value={formData.estimated_duration}
+                  onChange={(e) =>
+                    handleFieldChange('estimated_duration', parseInt(e.target.value) || (roleInfo?.defaultDuration ?? 60))
+                  }
+                  placeholder={roleInfo ? `Default: ${roleInfo.defaultDuration} min` : "60"}
+                />
+              </div>
+            );
+          })()}
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="scheduled_time">Scheduled Time</Label>
+          <Label htmlFor="location">Location</Label>
           <Input
-            id="scheduled_time"
-            type="time"
-            value={formData.scheduled_time}
-            onChange={(e) => setFormData({ ...formData, scheduled_time: e.target.value })}
+            id="location"
+            value={formData.location}
+            onChange={(e) => handleFieldChange('location', e.target.value)}
+            placeholder="Specific location or area"
           />
         </div>
-      </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        {(() => {
-          const roleInfo = getRoleInfo(formData.assigned_to);
-          const isRoomRequired = roleInfo ? roleInfo.requiresRoom : false;
-          return (
-            <div className="space-y-2">
-              <Label htmlFor="room_id">
-                Room {isRoomRequired ? '*' : '(Optional)'}
-              </Label>
-              <Select 
-                value={formData.room_id} 
-                onValueChange={(value) => setFormData({ ...formData, room_id: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select room" />
-                </SelectTrigger>
-                <SelectContent>
-                  {!isRoomRequired && (
-                    <SelectItem value="none">No specific room</SelectItem>
-                  )}
-                  {rooms.map((room) => (
-                    <SelectItem key={room.id} value={room.id.toString()}>
-                      Room {room.number} ({room.type})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {isRoomRequired && (
-                <p className="text-xs text-red-600">
-                  Room selection is required for this task type
-                </p>
-              )}
-            </div>
-          );
-        })()}
-
-        {(() => {
-          const roleInfo = getRoleInfo(formData.assigned_to);
-          return (
-            <div className="space-y-2">
-              <Label htmlFor="estimated_duration">Estimated Duration (minutes)</Label>
-              <Input
-                id="estimated_duration"
-                type="number"
-                min="15"
-                step="15"
-                value={formData.estimated_duration}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    estimated_duration:
-                      parseInt(e.target.value) || (roleInfo?.defaultDuration ?? 60),
-                  })
-                }
-                placeholder={roleInfo ? `Default: ${roleInfo.defaultDuration} min` : "60"}
-              />
-            </div>
-          );
-        })()}
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="location">Location</Label>
-        <Input
-          id="location"
-          value={formData.location}
-          onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-          placeholder="Specific location or area"
-        />
-      </div>
-
-      <DialogFooter>
-        <Button type="button" variant="outline" onClick={() => {
-          if (isEdit) {
-            setIsEditDialogOpen(false);
-            setSelectedTask(null);
-          } else {
-            setIsCreateDialogOpen(false);
-          }
-          resetForm();
-        }}>
-          Cancel
-        </Button>
-        <Button type="submit">{submitText}</Button>
-      </DialogFooter>
-    </form>
-  );
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => {
+            if (isEdit) {
+              setIsEditDialogOpen(false);
+              setSelectedTask(null);
+            } else {
+              setIsCreateDialogOpen(false);
+            }
+            resetForm();
+          }}>
+            Cancel
+          </Button>
+          <Button type="submit">{submitText}</Button>
+        </DialogFooter>
+      </form>
+    );
+  };
 
   const TaskCard = ({ task }: { task: Task }) => (
     <Card className="hover:shadow-md transition-shadow">
@@ -1102,17 +1151,29 @@ const AdminTaskAssignment: React.FC = () => {
             </Badge>
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" type="button">
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-40">
                 <div className="space-y-2">
-                  <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => openEditDialog(task)}>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="w-full justify-start" 
+                    onClick={() => openEditDialog(task)}
+                    type="button"
+                  >
                     <Edit className="h-4 w-4 mr-2" />
                     Edit
                   </Button>
-                  <Button variant="ghost" size="sm" className="w-full justify-start text-destructive" onClick={() => handleDeleteTask(task.id)}>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="w-full justify-start text-destructive" 
+                    onClick={() => handleDeleteTask(task.id)}
+                    type="button"
+                  >
                     <Trash2 className="h-4 w-4 mr-2" />
                     Delete
                   </Button>
@@ -1176,12 +1237,12 @@ const AdminTaskAssignment: React.FC = () => {
           
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button type="button">
                 <Plus className="h-4 w-4 mr-2" />
                 Assign New Task
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Assign New Task</DialogTitle>
                 <DialogDescription>
@@ -1311,6 +1372,11 @@ const AdminTaskAssignment: React.FC = () => {
                 <TaskCard key={task.id} task={task} />
               ))}
             </div>
+            {filteredTasks.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                No tasks found matching your filters.
+              </div>
+            )}
           </TabsContent>
           
           <TabsContent value="pending" className="space-y-4">
@@ -1319,6 +1385,11 @@ const AdminTaskAssignment: React.FC = () => {
                 <TaskCard key={task.id} task={task} />
               ))}
             </div>
+            {getTasksByStatus('pending').length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                No pending tasks found.
+              </div>
+            )}
           </TabsContent>
           
           <TabsContent value="in-progress" className="space-y-4">
@@ -1327,6 +1398,11 @@ const AdminTaskAssignment: React.FC = () => {
                 <TaskCard key={task.id} task={task} />
               ))}
             </div>
+            {getTasksByStatus('in_progress').length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                No tasks in progress found.
+              </div>
+            )}
           </TabsContent>
           
           <TabsContent value="completed" className="space-y-4">
@@ -1335,12 +1411,17 @@ const AdminTaskAssignment: React.FC = () => {
                 <TaskCard key={task.id} task={task} />
               ))}
             </div>
+            {getTasksByStatus('completed').length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                No completed tasks found.
+              </div>
+            )}
           </TabsContent>
         </Tabs>
 
         {/* Edit Task Dialog */}
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Edit Task</DialogTitle>
               <DialogDescription>

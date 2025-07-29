@@ -55,6 +55,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // Admin staff routes
         Route::get('/staff', [StaffController::class, 'index'])->name('staff.index');
+        Route::post('/staff', [StaffController::class, 'store'])->name('staff.store');
         Route::get('/staff/create', [StaffController::class, 'create'])->name('staff.create');
         Route::get('/staff/{staff}', [StaffController::class, 'show'])->name('staff.show');
         Route::get('/staff/{staff}/edit', [StaffController::class, 'edit'])->name('staff.edit');

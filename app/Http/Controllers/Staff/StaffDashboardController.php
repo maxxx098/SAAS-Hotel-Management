@@ -367,17 +367,39 @@ public function index(): Response
     /**
      * Get housekeeping statistics - REAL DATA
      */
-    private function getHousekeepingStats($user, $today): array
-    {
-        // Get actual room assignments
-        $assignedRooms = RoomAssignment::where('staff_id', $user->id)
-            ->whereDate('date', $today)
-            ->count();
+  private function getHousekeepingStats($user, $today): array
+{
+    try {
+        // Try to get actual room assignments first
+        $assignedRooms = 0;
+        $cleanedRooms = 0;
+        
+        try {
+            $assignedRooms = RoomAssignment::where('staff_id', $user->id)
+                ->whereDate('date', $today)
+                ->count();
 
-        $cleanedRooms = RoomAssignment::where('staff_id', $user->id)
-            ->whereDate('date', $today)
-            ->where('status', 'completed')
-            ->count();
+            $cleanedRooms = RoomAssignment::where('staff_id', $user->id)
+                ->whereDate('date', $today)
+                ->where('status', 'completed')
+                ->count();
+        } catch (\Exception $e) {
+            Log::warning('RoomAssignment table not available, using StaffTask fallback', [
+                'error' => $e->getMessage()
+            ]);
+            
+            // Fallback: Use StaffTask for room cleaning tasks
+            $assignedRooms = StaffTask::where('assigned_to', $user->id)
+                ->whereDate('scheduled_at', $today)
+                ->where('type', 'room_cleaning')
+                ->count();
+
+            $cleanedRooms = StaffTask::where('assigned_to', $user->id)
+                ->whereDate('scheduled_at', $today)
+                ->where('type', 'room_cleaning')
+                ->where('status', 'completed')
+                ->count();
+        }
 
         $pendingRooms = $assignedRooms - $cleanedRooms;
 
@@ -395,7 +417,21 @@ public function index(): Response
             'tasksCompleted' => $tasksCompleted,
             'efficiency' => $assignedRooms > 0 ? round(($cleanedRooms / $assignedRooms) * 100) : 0,
         ];
+    } catch (\Exception $e) {
+        Log::error('Error in getHousekeepingStats', [
+            'error' => $e->getMessage(),
+            'user_id' => $user->id
+        ]);
+        return [
+            'assignedRooms' => 0,
+            'cleanedRooms' => 0,
+            'pendingRooms' => 0,
+            'maintenanceReports' => 0,
+            'tasksCompleted' => 0,
+            'efficiency' => 0,
+        ];
     }
+}
 
     /**
      * Get maintenance statistics - REAL DATA
@@ -517,58 +553,61 @@ public function index(): Response
     /**
      * Get general staff statistics - REAL DATA
      */
-  private function getGeneralStaffStats($user, $today): array
-    {
-        try {
-             $tasksAssigned = StaffTask::where('assigned_to', $user->id)
-            ->whereDate('scheduled_at', $today) // Fix: Use scheduled_at
+ private function getGeneralStaffStats($user, $today): array
+{
+    try {
+        $tasksAssigned = StaffTask::where('assigned_to', $user->id)
+            ->whereDate('scheduled_at', $today)
             ->count() ?? 0;
 
-        $tasksCompleted = $this->getCompletedTasksCount($user->id, $today);
+        // Fix: Add missing $tasksCompleted variable
+        $tasksCompleted = StaffTask::where('assigned_to', $user->id)
+            ->whereDate('scheduled_at', $today)
+            ->where('status', 'completed')
+            ->count() ?? 0;
 
         $tasksPending = StaffTask::where('assigned_to', $user->id)
-            ->whereDate('scheduled_at', $today) // Fix: Use scheduled_at
+            ->whereDate('scheduled_at', $today)
             ->where('status', 'pending')
             ->count() ?? 0;
 
+        $hoursWorked = 0;
+        try {
+            $hoursWorked = $this->calculateHoursWorked($user, $today);
+        } catch (\Exception $e) {
+            Log::warning('Error calculating hours worked', ['error' => $e->getMessage()]);
             $hoursWorked = 0;
-            try {
-                $hoursWorked = $this->calculateHoursWorked($user, $today);
-            } catch (\Exception $e) {
-                Log::warning('Error calculating hours worked', ['error' => $e->getMessage()]);
-                $hoursWorked = 0;
-            }
+        }
 
-            // Get current schedule with better error handling
-            $currentSchedule = null;
-            try {
-                $currentSchedule = StaffSchedule::where('staff_id', $user->id)
-                    ->whereDate('date', $today)
-                    ->first();
-            } catch (\Exception $e) {
-                Log::warning('StaffSchedule table might not exist', ['error' => $e->getMessage()]);
-            }
+        // Get current schedule with better error handling
+        $currentSchedule = null;
+        try {
+            $currentSchedule = StaffSchedule::where('staff_id', $user->id)
+                ->whereDate('date', $today)
+                ->first();
+        } catch (\Exception $e) {
+            Log::warning('StaffSchedule table might not exist', ['error' => $e->getMessage()]);
+        }
 
-            $shiftStatus = $this->determineShiftStatus($currentSchedule);
-
-            $performance = $tasksAssigned > 0 ? round(($tasksCompleted / $tasksAssigned) * 100) : 0;
+        $shiftStatus = $this->determineShiftStatus($currentSchedule);
+        $performance = $tasksAssigned > 0 ? round(($tasksCompleted / $tasksAssigned) * 100) : 0;
 
         return [
             'tasksAssigned' => $tasksAssigned,
             'tasksCompleted' => $tasksCompleted,
             'tasksPending' => $tasksPending,
-            'hoursWorked' => 0, // You can implement this later
-            'shiftStatus' => 'on_duty', // You can implement this later
+            'hoursWorked' => $hoursWorked,
+            'shiftStatus' => $shiftStatus,
             'performance' => $performance,
         ];
-        } catch (\Exception $e) {
+    } catch (\Exception $e) {
         Log::error('Error in getGeneralStaffStats', [
             'error' => $e->getMessage(),
             'user_id' => $user->id
         ]);
         return $this->getEmptyGeneralStats();
     }
-    }
+}
     /**
      * Get today's tasks for staff - REAL DATA
      */
@@ -680,11 +719,12 @@ public function index(): Response
     /**
      * Get housekeeping tasks - REAL DATA
      */
-    private function getHousekeepingTasks($user, $today): array
-    {
-        $tasks = [];
+private function getHousekeepingTasks($user, $today): array
+{
+    $tasks = [];
 
-        // Room assignments
+    try {
+        // Room assignments - with error handling
         $roomAssignments = RoomAssignment::with('room')
             ->where('staff_id', $user->id)
             ->whereDate('date', $today)
@@ -705,30 +745,65 @@ public function index(): Response
                 'cleaning_type' => $assignment->cleaning_type,
             ];
         }
+    } catch (\Exception $e) {
+        Log::warning('RoomAssignment table error, using StaffTask instead', [
+            'error' => $e->getMessage(),
+            'user_id' => $user->id
+        ]);
+        
+        // Fallback: Get housekeeping tasks from StaffTask table
+        $housekeepingTasks = StaffTask::with(['room'])
+            ->where('assigned_to', $user->id)
+            ->whereDate('scheduled_at', $today)
+            ->where('type', 'room_cleaning')
+            ->where('status', '!=', 'completed')
+            ->get();
 
-        // General housekeeping tasks
-       $generalTasks = StaffTask::with(['room'])
-        ->where('assigned_to', $user->id)
-        ->whereDate('scheduled_at', $today) // Fix: Use scheduled_at
-        ->where('status', '!=', 'completed')
-        ->get();
-
-    foreach ($generalTasks as $task) {
-        $tasks[] = [
-            'id' => $task->id,
-            'type' => $task->type,
-            'title' => $task->title,
-            'description' => $task->description,
-            'time' => $task->scheduled_at ? $task->scheduled_at->format('H:i') : 'TBD', // Fix
-            'priority' => $task->priority,
-            'status' => $task->status,
-            'room_number' => $task->room->number ?? null,
-            'estimated_duration' => $task->estimated_duration,
-        ];
+        foreach ($housekeepingTasks as $task) {
+            $tasks[] = [
+                'id' => $task->id,
+                'type' => 'room_cleaning',
+                'title' => $task->title,
+                'description' => $task->description,
+                'time' => $task->scheduled_at ? $task->scheduled_at->format('H:i') : 'TBD',
+                'priority' => $task->priority,
+                'status' => $task->status,
+                'room_number' => $task->room->number ?? 'N/A',
+                'estimated_duration' => $task->estimated_duration ?? 45,
+            ];
+        }
     }
 
-        return $tasks;
+    // General housekeeping tasks
+    try {
+        $generalTasks = StaffTask::with(['room'])
+            ->where('assigned_to', $user->id)
+            ->whereDate('scheduled_at', $today)
+            ->where('status', '!=', 'completed')
+            ->get();
+
+        foreach ($generalTasks as $task) {
+            $tasks[] = [
+                'id' => $task->id,
+                'type' => $task->type,
+                'title' => $task->title,
+                'description' => $task->description,
+                'time' => $task->scheduled_at ? $task->scheduled_at->format('H:i') : 'TBD',
+                'priority' => $task->priority,
+                'status' => $task->status,
+                'room_number' => $task->room->number ?? null,
+                'estimated_duration' => $task->estimated_duration,
+            ];
+        }
+    } catch (\Exception $e) {
+        Log::error('Error fetching general housekeeping tasks', [
+            'error' => $e->getMessage(),
+            'user_id' => $user->id
+        ]);
     }
+
+    return $tasks;
+}
 
     /**
      * Get maintenance tasks - REAL DATA
@@ -811,7 +886,7 @@ public function index(): Response
         // Get scheduled patrols
         $patrols = StaffTask::where('assigned_to', $user->id)
             ->where('type', 'patrol')
-            ->whereDate('scheduled_date', $today)
+            ->whereDate('scheduled_at', $today)
             ->where('status', '!=', 'completed')
             ->get();
 
@@ -884,7 +959,7 @@ private function getGeneralTasks($user, $today): array
 
     $generalTasks = StaffTask::with(['room', 'booking'])
         ->where('assigned_to', $user->id)
-        ->whereDate('scheduled_at', $today) // Fix: Use scheduled_at instead of scheduled_date
+        ->whereDate('scheduled_at', $today) 
         ->where('status', '!=', 'completed')
         ->orderBy('priority', 'desc')
         ->get();
@@ -909,14 +984,15 @@ private function getGeneralTasks($user, $today): array
     /**
      * Get assigned rooms data - REAL DATA
      */
-    private function getAssignedRoomsData($user): array
-    {
-        if ($user->role !== 'housekeeping') {
-            return [];
-        }
+  private function getAssignedRoomsData($user): array
+{
+    if ($user->role !== 'housekeeping') {
+        return [];
+    }
 
-        $today = Carbon::today();
-        
+    $today = Carbon::today();
+    
+    try {
         $assignments = RoomAssignment::with(['room'])
             ->where('staff_id', $user->id)
             ->whereDate('date', $today)
@@ -936,7 +1012,35 @@ private function getGeneralTasks($user, $today): array
                 'notes' => $assignment->notes,
             ];
         })->toArray();
+    } catch (\Exception $e) {
+        Log::warning('RoomAssignment table not available, using StaffTask fallback', [
+            'error' => $e->getMessage(),
+            'user_id' => $user->id
+        ]);
+        
+        // Fallback: Use StaffTask for room assignments
+        $tasks = StaffTask::with(['room'])
+            ->where('assigned_to', $user->id)
+            ->whereDate('scheduled_at', $today)
+            ->where('type', 'room_cleaning')
+            ->get();
+
+        return $tasks->map(function ($task) {
+            return [
+                'id' => $task->id,
+                'room_number' => $task->room->number ?? 'N/A',
+                'room_type' => $task->room->type ?? 'Standard',
+                'status' => $task->status,
+                'cleaning_type' => 'standard',
+                'priority' => $task->priority,
+                'scheduled_time' => $task->scheduled_at ? $task->scheduled_at->format('H:i') : null,
+                'estimated_duration' => $task->estimated_duration ?? 45,
+                'notes' => $task->description,
+            ];
+        })->toArray();
     }
+}
+
 
     /**
      * Get maintenance requests data - REAL DATA
@@ -989,7 +1093,22 @@ private function getGeneralTasks($user, $today): array
             ];
         })->toArray();
     }
-
+private function updateRoomCleaningStatus($assignmentId, $status, $staffId): void
+{
+    try {
+        RoomAssignment::where('id', $assignmentId)
+            ->where('staff_id', $staffId)
+            ->update([
+                'status' => $status,
+                'completed_at' => $status === 'completed' ? now() : null,
+                'started_at' => $status === 'in_progress' ? now() : null,
+                'updated_at' => now(),
+            ]);
+    } catch (\Exception $e) {
+        // If RoomAssignment table doesn't exist, throw exception to trigger fallback
+        throw $e;
+    }
+}
     /**
      * Get staff schedule data - REAL DATA
      */
@@ -1093,18 +1212,7 @@ private function getGeneralTasks($user, $today): array
         }
     }
 
-    private function updateRoomCleaningStatus($assignmentId, $status, $staffId): void
-    {
-        RoomAssignment::where('id', $assignmentId)
-            ->where('staff_id', $staffId)
-            ->update([
-                'status' => $status,
-                'completed_at' => $status === 'completed' ? now() : null,
-                'started_at' => $status === 'in_progress' ? now() : null,
-                'updated_at' => now(),
-            ]);
-    }
-
+   
     private function updateBookingStatus($bookingId, $status, $taskType): void
     {
         $updateData = ['updated_at' => now()];
