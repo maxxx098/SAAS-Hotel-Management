@@ -41,13 +41,32 @@ class StaffTask extends Model
     ];
 
     const TYPES = [
+        // General
+        'general' => 'General Task',
+        
+        // Housekeeping
         'room_cleaning' => 'Room Cleaning',
+        'cleaning' => 'General Cleaning',
+        'laundry' => 'Laundry Service',
+        'maintenance_request' => 'Maintenance Request',
+        
+        // Maintenance
         'maintenance' => 'Maintenance',
+        'repair' => 'Repair Work',
+        'inspection' => 'Inspection',
+        'preventive_maintenance' => 'Preventive Maintenance',
+        
+        // Front Desk
+        'guest_service' => 'Guest Service',
         'check_in' => 'Guest Check-in',
         'check_out' => 'Guest Check-out',
-        'guest_service' => 'Guest Service',
-        'security_patrol' => 'Security Patrol',
-        'general' => 'General Task',
+        'booking_management' => 'Booking Management',
+        
+        // Security
+        'security_check' => 'Security Check',
+        'patrol' => 'Security Patrol',
+        'incident_report' => 'Incident Report',
+        'access_control' => 'Access Control',
     ];
 
     const PRIORITIES = [
@@ -198,4 +217,3 @@ class StaffTask extends Model
         return self::STATUSES[$this->status] ?? ucfirst($this->status);
     }
 }
-
