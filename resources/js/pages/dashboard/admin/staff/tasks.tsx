@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, usePage, router } from '@inertiajs/react';
@@ -384,7 +384,293 @@ interface PageProps {
   departments: string[];
   [key: string]: unknown;
 }
+interface TaskFormProps {
+  onSubmit: (e: React.FormEvent) => void;
+  submitText: string;
+  isEdit?: boolean;
+  formData: {
+    title: string;
+    description: string;
+    type: string;
+    priority: 'low' | 'medium' | 'high' | 'urgent';
+    assigned_to: string;
+    room_id: string;
+    scheduled_date: Date;
+    scheduled_time: string;
+    estimated_duration: number;
+    location: string;
+  };
+  handleFieldChange: (field: string, value: any) => void;
+  staff: Staff[];
+  rooms: Room[];
+  availableTaskTypes: string[];
+  getTaskTypesForRole: (staffId: string) => string[];
+  getRoleInfo: (staffId: string) => {
+    description: string;
+    requiresRoom: boolean;
+    defaultDuration: number;
+  } | null;
+  roleColors: { [key: string]: string };
+  resetForm: () => void;
+  setIsCreateDialogOpen: (open: boolean) => void;
+  setIsEditDialogOpen: (open: boolean) => void;
+  setSelectedTask: (task: Task | null) => void;
+}
 
+const TaskForm: React.FC<TaskFormProps> = ({
+  onSubmit,
+  submitText,
+  isEdit = false,
+  formData,
+  handleFieldChange,
+  staff,
+  rooms,
+  availableTaskTypes,
+  getTaskTypesForRole,
+  getRoleInfo,
+  roleColors,
+  resetForm,
+  setIsCreateDialogOpen,
+  setIsEditDialogOpen,
+  setSelectedTask
+}) => {
+  return (
+    <form onSubmit={onSubmit} className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="title">Task Title *</Label>
+          <Input
+            id="title"
+            value={formData.title}
+            onChange={(e) => handleFieldChange('title', e.target.value)}
+            placeholder="Enter task title"
+            required
+            maxLength={255}
+          />
+        </div>
+        
+        {(() => {
+          const availableTypes = getTaskTypesForRole(formData.assigned_to);
+          const roleInfo = getRoleInfo(formData.assigned_to);
+          return (
+            <div className="space-y-2">
+              <Label htmlFor="type">Task Type *</Label>
+              <Select
+                value={formData.type}
+                onValueChange={(value) => {
+                  handleFieldChange('type', value);
+                  // Auto-set default duration based on role and type
+                  if (roleInfo && !formData.estimated_duration) {
+                    handleFieldChange('estimated_duration', roleInfo.defaultDuration);
+                  }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select task type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableTypes.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {roleInfo && (
+                <p className="text-xs text-muted-foreground">
+                  {roleInfo.description}
+                </p>
+              )}
+            </div>
+          );
+        })()}
+      </div>
+
+      <div className="col-span-2 space-y-2">
+        <Label htmlFor="description">Description</Label>
+        <Textarea
+          id="description"
+          value={formData.description}
+          onChange={(e) => handleFieldChange('description', e.target.value)}
+          placeholder="Enter task description"
+          rows={3}
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="assigned_to">Assign To *</Label>
+          <Select
+            value={formData.assigned_to}
+            onValueChange={(value) => {
+              handleFieldChange('assigned_to', value);
+              // Reset type if the new staff doesn't have the current type
+              if (!getTaskTypesForRole(value).includes(formData.type)) {
+                handleFieldChange('type', '');
+              }
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select staff member" />
+            </SelectTrigger>
+            <SelectContent>
+              {staff.map((member) => (
+                <SelectItem key={member.id} value={member.id.toString()}>
+                  <div className="flex items-center gap-2">
+                    <span>{member.name}</span>
+                    <Badge
+                      variant="outline"
+                      className={roleColors[member.role as keyof typeof roleColors] || 'bg-gray-100 text-gray-800'}
+                    >
+                      {member.role.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    </Badge>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="priority">Priority *</Label>
+          <Select 
+            value={formData.priority} 
+            onValueChange={(value: 'low' | 'medium' | 'high' | 'urgent') => handleFieldChange('priority', value)}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="low">Low</SelectItem>
+              <SelectItem value="medium">Medium</SelectItem>
+              <SelectItem value="high">High</SelectItem>
+              <SelectItem value="urgent">Urgent</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Scheduled Date *</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-full justify-start text-left font-normal",
+                  !formData.scheduled_date && "text-muted-foreground"
+                )}
+                type="button"
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {formData.scheduled_date ? format(formData.scheduled_date, "PPP") : "Pick a date"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0">
+              <Calendar
+                selected={formData.scheduled_date}
+                onSelect={(date) => date && handleFieldChange('scheduled_date', date)}
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="scheduled_time">Scheduled Time</Label>
+          <Input
+            id="scheduled_time"
+            type="time"
+            value={formData.scheduled_time}
+            onChange={(e) => handleFieldChange('scheduled_time', e.target.value)}
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        {(() => {
+          const roleInfo = getRoleInfo(formData.assigned_to);
+          const isRoomRequired = roleInfo ? roleInfo.requiresRoom : false;
+          return (
+            <div className="space-y-2">
+              <Label htmlFor="room_id">
+                Room {isRoomRequired ? '*' : '(Optional)'}
+              </Label>
+              <Select 
+                value={formData.room_id} 
+                onValueChange={(value) => handleFieldChange('room_id', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select room" />
+                </SelectTrigger>
+                <SelectContent>
+                  {!isRoomRequired && (
+                    <SelectItem value="none">No specific room</SelectItem>
+                  )}
+                  {rooms.map((room) => (
+                    <SelectItem key={room.id} value={room.id.toString()}>
+                      Room {room.number} ({room.type})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {isRoomRequired && (
+                <p className="text-xs text-red-600">
+                  Room selection is required for this task type
+                </p>
+              )}
+            </div>
+          );
+        })()}
+
+        {(() => {
+          const roleInfo = getRoleInfo(formData.assigned_to);
+          return (
+            <div className="space-y-2">
+              <Label htmlFor="estimated_duration">Estimated Duration (minutes)</Label>
+              <Input
+                id="estimated_duration"
+                type="number"
+                min="15"
+                step="15"
+                value={formData.estimated_duration}
+                onChange={(e) =>
+                  handleFieldChange('estimated_duration', parseInt(e.target.value) || (roleInfo?.defaultDuration ?? 60))
+                }
+                placeholder={roleInfo ? `Default: ${roleInfo.defaultDuration} min` : "60"}
+              />
+            </div>
+          );
+        })()}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="location">Location</Label>
+        <Input
+          id="location"
+          value={formData.location}
+          onChange={(e) => handleFieldChange('location', e.target.value)}
+          placeholder="Specific location or area"
+        />
+      </div>
+
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={() => {
+          if (isEdit) {
+            setIsEditDialogOpen(false);
+            setSelectedTask(null);
+          } else {
+            setIsCreateDialogOpen(false);
+          }
+          resetForm();
+        }}>
+          Cancel
+        </Button>
+        <Button type="submit">{submitText}</Button>
+      </DialogFooter>
+    </form>
+  );
+};
 const AdminTaskAssignment: React.FC = () => {
   const { staff, rooms, tasks, taskTypes, departments } = usePage<PageProps>().props;
   
@@ -882,258 +1168,15 @@ const AdminTaskAssignment: React.FC = () => {
   const getTasksByStatus = (status: string) => {
     return filteredTasks.filter(task => task.status === status);
   };
+ const handleFieldChange = useCallback((field: string, value: any) => {
+  setFormData(prev => ({
+    ...prev,
+    [field]: value
+  }));
+}, []);
 
   // Fixed TaskForm component with proper form handling
-  const TaskForm = ({ onSubmit, submitText, isEdit = false }: { 
-    onSubmit: (e: React.FormEvent) => void; 
-    submitText: string;
-    isEdit?: boolean;
-  }) => {
-    // Handle form field changes properly
-    const handleFieldChange = (field: string, value: any) => {
-      setFormData(prev => ({
-        ...prev,
-        [field]: value
-      }));
-    };
-
-    return (
-      <form onSubmit={onSubmit} className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="title">Task Title *</Label>
-            <Input
-              id="title"
-              value={formData.title}
-              onChange={(e) => handleFieldChange('title', e.target.value)}
-              placeholder="Enter task title"
-              required
-              maxLength={255}
-            />
-          </div>
-          
-          {(() => {
-            const availableTypes = getTaskTypesForRole(formData.assigned_to);
-            const roleInfo = getRoleInfo(formData.assigned_to);
-            return (
-              <div className="space-y-2">
-                <Label htmlFor="type">Task Type *</Label>
-                <Select
-                  value={formData.type}
-                  onValueChange={(value) => {
-                    handleFieldChange('type', value);
-                    // Auto-set default duration based on role and type
-                    if (roleInfo && !formData.estimated_duration) {
-                      handleFieldChange('estimated_duration', roleInfo.defaultDuration);
-                    }
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select task type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableTypes.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {roleInfo && (
-                  <p className="text-xs text-muted-foreground">
-                    {roleInfo.description}
-                  </p>
-                )}
-              </div>
-            );
-          })()}
-        </div>
-
-        <div className="col-span-2 space-y-2">
-          <Label htmlFor="description">Description</Label>
-          <Textarea
-            id="description"
-            value={formData.description}
-            onChange={(e) => handleFieldChange('description', e.target.value)}
-            placeholder="Enter task description"
-            rows={3}
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="assigned_to">Assign To *</Label>
-            <Select
-              value={formData.assigned_to}
-              onValueChange={(value) => {
-                handleFieldChange('assigned_to', value);
-                // Reset type if the new staff doesn't have the current type
-                if (!getTaskTypesForRole(value).includes(formData.type)) {
-                  handleFieldChange('type', '');
-                }
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select staff member" />
-              </SelectTrigger>
-              <SelectContent>
-                {staff.map((member) => (
-                  <SelectItem key={member.id} value={member.id.toString()}>
-                    <div className="flex items-center gap-2">
-                      <span>{member.name}</span>
-                      <Badge
-                        variant="outline"
-                        className={roleColors[member.role as keyof typeof roleColors] || 'bg-gray-100 text-gray-800'}
-                      >
-                        {member.role.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                      </Badge>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="priority">Priority *</Label>
-            <Select 
-              value={formData.priority} 
-              onValueChange={(value: 'low' | 'medium' | 'high' | 'urgent') => handleFieldChange('priority', value)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="low">Low</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-                <SelectItem value="urgent">Urgent</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Scheduled Date *</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !formData.scheduled_date && "text-muted-foreground"
-                  )}
-                  type="button"
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {formData.scheduled_date ? format(formData.scheduled_date, "PPP") : "Pick a date"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar
-                  selected={formData.scheduled_date}
-                  onSelect={(date) => date && handleFieldChange('scheduled_date', date)}
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="scheduled_time">Scheduled Time</Label>
-            <Input
-              id="scheduled_time"
-              type="time"
-              value={formData.scheduled_time}
-              onChange={(e) => handleFieldChange('scheduled_time', e.target.value)}
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          {(() => {
-            const roleInfo = getRoleInfo(formData.assigned_to);
-            const isRoomRequired = roleInfo ? roleInfo.requiresRoom : false;
-            return (
-              <div className="space-y-2">
-                <Label htmlFor="room_id">
-                  Room {isRoomRequired ? '*' : '(Optional)'}
-                </Label>
-                <Select 
-                  value={formData.room_id} 
-                  onValueChange={(value) => handleFieldChange('room_id', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select room" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {!isRoomRequired && (
-                      <SelectItem value="none">No specific room</SelectItem>
-                    )}
-                    {rooms.map((room) => (
-                      <SelectItem key={room.id} value={room.id.toString()}>
-                        Room {room.number} ({room.type})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {isRoomRequired && (
-                  <p className="text-xs text-red-600">
-                    Room selection is required for this task type
-                  </p>
-                )}
-              </div>
-            );
-          })()}
-
-          {(() => {
-            const roleInfo = getRoleInfo(formData.assigned_to);
-            return (
-              <div className="space-y-2">
-                <Label htmlFor="estimated_duration">Estimated Duration (minutes)</Label>
-                <Input
-                  id="estimated_duration"
-                  type="number"
-                  min="15"
-                  step="15"
-                  value={formData.estimated_duration}
-                  onChange={(e) =>
-                    handleFieldChange('estimated_duration', parseInt(e.target.value) || (roleInfo?.defaultDuration ?? 60))
-                  }
-                  placeholder={roleInfo ? `Default: ${roleInfo.defaultDuration} min` : "60"}
-                />
-              </div>
-            );
-          })()}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="location">Location</Label>
-          <Input
-            id="location"
-            value={formData.location}
-            onChange={(e) => handleFieldChange('location', e.target.value)}
-            placeholder="Specific location or area"
-          />
-        </div>
-
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => {
-            if (isEdit) {
-              setIsEditDialogOpen(false);
-              setSelectedTask(null);
-            } else {
-              setIsCreateDialogOpen(false);
-            }
-            resetForm();
-          }}>
-            Cancel
-          </Button>
-          <Button type="submit">{submitText}</Button>
-        </DialogFooter>
-      </form>
-    );
-  };
+  
 
   const TaskCard = ({ task }: { task: Task }) => (
     <Card className="hover:shadow-md transition-shadow">
@@ -1249,7 +1292,22 @@ const AdminTaskAssignment: React.FC = () => {
                   Create and assign a new task to a staff member
                 </DialogDescription>
               </DialogHeader>
-              <TaskForm onSubmit={handleCreateTask} submitText="Assign Task" />
+              <TaskForm 
+              onSubmit={handleCreateTask} 
+              submitText="Assign Task"
+              formData={formData}
+              handleFieldChange={handleFieldChange}
+              staff={staff}
+              rooms={rooms}
+              availableTaskTypes={availableTaskTypes}
+              getTaskTypesForRole={getTaskTypesForRole}
+              getRoleInfo={getRoleInfo}
+              roleColors={roleColors}
+              resetForm={resetForm}
+              setIsCreateDialogOpen={setIsCreateDialogOpen}
+              setIsEditDialogOpen={setIsEditDialogOpen}
+              setSelectedTask={setSelectedTask}
+            />
             </DialogContent>
           </Dialog>
         </div>
@@ -1428,7 +1486,23 @@ const AdminTaskAssignment: React.FC = () => {
                 Update the task details and assignment
               </DialogDescription>
             </DialogHeader>
-            <TaskForm onSubmit={handleUpdateTask} submitText="Update Task" isEdit={true} />
+            <TaskForm 
+              onSubmit={handleUpdateTask} 
+              submitText="Update Task" 
+              isEdit={true}
+              formData={formData}
+              handleFieldChange={handleFieldChange}
+              staff={staff}
+              rooms={rooms}
+              availableTaskTypes={availableTaskTypes}
+              getTaskTypesForRole={getTaskTypesForRole}
+              getRoleInfo={getRoleInfo}
+              roleColors={roleColors}
+              resetForm={resetForm}
+              setIsCreateDialogOpen={setIsCreateDialogOpen}
+              setIsEditDialogOpen={setIsEditDialogOpen}
+              setSelectedTask={setSelectedTask}
+            />
           </DialogContent>
         </Dialog>
       </div>
