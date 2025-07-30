@@ -265,7 +265,7 @@ public function tasks(Request $request): Response
     /**
      * Store a new task assignment
      */
-   public function storeTask(Request $request) 
+  public function storeTask(Request $request) 
 {     
     $validator = Validator::make($request->all(), [         
         'title' => 'required|string|max:255',         
@@ -279,7 +279,7 @@ public function tasks(Request $request): Response
     ]);      
 
     if ($validator->fails()) {         
-        return back()->withErrors($validator)->withInput();     
+        return response()->json(['errors' => $validator->errors()], 422);     
     }      
 
     try {         
@@ -295,8 +295,8 @@ public function tasks(Request $request): Response
                     RoomAssignment::create([
                         'staff_id' => $request->assigned_to,
                         'room_id' => $request->room_id,
-                        'date' => Carbon::parse($request->scheduled_at)->toDateString(),
-                        'scheduled_time' => Carbon::parse($request->scheduled_at)->toTimeString(),
+                        'date' => $request->scheduled_at ? Carbon::parse($request->scheduled_at)->toDateString() : Carbon::today()->toDateString(),
+                        'scheduled_time' => $request->scheduled_at ? Carbon::parse($request->scheduled_at)->toTimeString() : '09:00:00',
                         'cleaning_type' => $this->determineCleaningType($taskType),
                         'priority' => $request->priority,
                         'status' => 'pending',
@@ -354,39 +354,8 @@ public function tasks(Request $request): Response
                 }
                 break;
                 
-            case 'front_desk':
-                // For front desk, always use StaffTask but may also need to update bookings
-                StaffTask::create([
-                    'title' => $request->title,
-                    'description' => $request->description,
-                    'type' => $request->type,
-                    'priority' => $request->priority,
-                    'status' => 'pending',
-                    'assigned_to' => $request->assigned_to,
-                    'room_id' => $request->room_id,
-                    'scheduled_at' => $request->scheduled_at,
-                    'estimated_duration' => $request->estimated_duration,
-                    'created_by' => auth()->id(),
-                ]);
-                break;
-                
-            case 'security':
-                StaffTask::create([
-                    'title' => $request->title,
-                    'description' => $request->description,
-                    'type' => $request->type,
-                    'priority' => $request->priority,
-                    'status' => 'pending',
-                    'assigned_to' => $request->assigned_to,
-                    'room_id' => $request->room_id,
-                    'scheduled_at' => $request->scheduled_at,
-                    'estimated_duration' => $request->estimated_duration,
-                    'created_by' => auth()->id(),
-                ]);
-                break;
-                
             default:
-                // For general staff and unknown roles, use StaffTask
+                // For all other roles, use StaffTask
                 StaffTask::create([
                     'title' => $request->title,
                     'description' => $request->description,
@@ -417,7 +386,7 @@ public function tasks(Request $request): Response
             ]),
         ]);
 
-        return back()->with('success', 'Task assigned successfully.');      
+        return response()->json(['message' => 'Task assigned successfully.'], 201);      
 
     } catch (\Exception $e) {         
         Log::error('Failed to store task', [
@@ -427,10 +396,9 @@ public function tasks(Request $request): Response
             'admin_id' => auth()->id(),
         ]);
         
-        return back()->withErrors(['error' => 'Failed to assign task. Please try again.']);     
+        return response()->json(['error' => 'Failed to assign task. Please try again.'], 500);     
     } 
 }
-
     /**
      * Update an existing task
      */
