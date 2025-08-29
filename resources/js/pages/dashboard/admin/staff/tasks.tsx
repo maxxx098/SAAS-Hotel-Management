@@ -1320,7 +1320,7 @@ const AdminTaskAssignment: React.FC = () => {
               <Settings className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{tasks.length}</div>
+              <div className="text-2xl font-bold">{(tasks || []).length}</div>
             </CardContent>
           </Card>
           
@@ -1378,7 +1378,7 @@ const AdminTaskAssignment: React.FC = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Departments</SelectItem>
-                  {departments.map((dept) => (
+                  {(Array.isArray(departments) ? departments : []).map((dept) => (
                     <SelectItem key={dept} value={dept}>
                       {dept}
                     </SelectItem>
