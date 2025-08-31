@@ -70,7 +70,7 @@ export default function Welcome() {
         },
         {
             icon: <DollarSign className="h-8 w-8" />,
-            title: 'Revenue Management',
+            title: 'Revenue Management System',
             description: 'Optimize pricing strategies, track financial performance, and manage billing seamlessly.',
             badge: 'Dynamic pricing',
             color: 'from-red-500 to-red-700',
