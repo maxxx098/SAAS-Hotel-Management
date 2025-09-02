@@ -134,7 +134,7 @@ export default function RoomsPage({ rooms, filters, roomTypes }: RoomsPageProps)
       <Head title="Our Rooms" />
       
       {/* Main Container */}
-      <div className="container mx-auto px-4 sm:px-6 lg:px-16 max-w-7xl py-20 sm:py-20">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-16 max-w-7xl py-20 sm:py-40">
         
         {/* Header */}
         <div className="flex items-center justify-between mb-8">

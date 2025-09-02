@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Building, ArrowRight } from 'lucide-react';
 import { type SharedData } from '@/types';
 import { useEffect, useState } from 'react';
+import Logo from '@/assets/images/Logo.png'
 
 export default function Header() {
     const { auth } = usePage<SharedData>().props;
@@ -25,12 +26,11 @@ export default function Header() {
                     
                     {/* Logo - left */}
                     <Link href="/" className="flex items-center gap-2">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 shadow-md">
-                            <Building className="h-6 w-6 text-white" />
-                        </div>
-                        <span className="text-xl font-bold tracking-tight">
-                            Villa's Hotel
-                        </span>
+                        <img 
+                            src={Logo} 
+                            alt="Villa's Hotel Logo" 
+                            className="h-20 w-auto object-contain rounded-lg " 
+                        />
                     </Link>
                     
                     {/* Center navigation */}
