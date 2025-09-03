@@ -9,6 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { Search, Users, Bed, Maximize2, Wifi, Tv, Car, Coffee, Bath, Shield, Wind, Utensils, Star, MapPin, Building, Filter, Link, ArrowRight } from 'lucide-react';
 import { SharedData } from '@/types';
 import Layout from '@/components/layout';
+import HeroSection from './hero';
 interface Room {
   id: number;
   name: string;
@@ -24,6 +25,7 @@ interface Room {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+   is_popular: boolean;
 }
 
 interface PaginatedRooms {
@@ -130,34 +132,21 @@ export default function RoomsPage({ rooms, filters, roomTypes }: RoomsPageProps)
 
   return (
     <Layout>
+      <HeroSection/>
      <div className="min-h-screen bg-background text-foreground">
       <Head title="Our Rooms" />
       
       {/* Main Container */}
       <div className="container mx-auto px-4 sm:px-6 lg:px-16 max-w-7xl py-20 sm:py-40">
-        
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-4xl font-bold tracking-tight mb-2">Our Rooms</h1>
-            <p className="text-xl text-muted-foreground">Discover comfort and luxury in our carefully designed accommodations</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary" className="bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 text-lg py-2 px-4">
-              {rooms.total} Total Rooms
-            </Badge>
-          </div>
-        </div>
-
         {/* Statistics Cards */}
         <div className="grid gap-6 md:grid-cols-3 mb-8">
           <Card className="border-border">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Rooms</CardTitle>
-              <Building className="h-4 w-4 text-muted-foreground" />
+              <Building className="h-4 w-4  text-[#F4C2A1]" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{roomStats.totalRooms}</div>
+              <div className="text-2xl font-bold text-[#F4C2A1]text-[#F4C2A1]">{roomStats.totalRooms}</div>
               <p className="text-xs text-muted-foreground">Available for booking</p>
             </CardContent>
           </Card>
@@ -165,10 +154,10 @@ export default function RoomsPage({ rooms, filters, roomTypes }: RoomsPageProps)
           <Card className="border-border">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Available Now</CardTitle>
-              <Bed className="h-4 w-4 text-green-500" />
+              <Bed className="h-4 w-4 text-[#F4C2A1]" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600 dark:text-green-400">{roomStats.availableRooms}</div>
+              <div className="text-2xl font-bold text-[#F4C2A1]">{roomStats.availableRooms}</div>
               <p className="text-xs text-muted-foreground">Ready for booking</p>
             </CardContent>
           </Card>
@@ -176,7 +165,7 @@ export default function RoomsPage({ rooms, filters, roomTypes }: RoomsPageProps)
           <Card className="border-border">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Average Price</CardTitle>
-              <Star className="h-4 w-4 text-yellow-500" />
+              <Star className="h-4 w-4 text-[#F4C2A1]" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">${roomStats.avgPrice.toFixed(0)}</div>
@@ -244,7 +233,7 @@ export default function RoomsPage({ rooms, filters, roomTypes }: RoomsPageProps)
               </div>
 
               <div className="flex flex-col justify-end space-y-2">
-                <Button onClick={handleSearch} disabled={isSearching}>
+                <Button className='bg-[#F4C2A1] text-black font-semibold' onClick={handleSearch} disabled={isSearching}>
                   <Filter className="h-4 w-4 mr-2" />
                   {isSearching ? 'Searching...' : 'Search'}
                 </Button>
@@ -290,12 +279,23 @@ export default function RoomsPage({ rooms, filters, roomTypes }: RoomsPageProps)
                 <div className="absolute top-3 right-3">
                   <Badge 
                     variant={room.is_available ? "default" : "destructive"}
-                    className={room.is_available ? "bg-green-500 hover:bg-green-600" : ""}
+                    className={room.is_available ? "bg-[#F4C2A1]" : ""}
                   >
                     {room.is_available ? 'Available' : 'Unavailable'}
                   </Badge>
                 </div>
+                {/* Room Type + Popular Badge */}
+                <div className="absolute top-3 left-3 flex flex-col gap-2">
+                  <Badge variant="secondary">
+                    {typeLabels[room.type] || room.type}
+                  </Badge>
 
+                  {room.is_popular && (
+                    <Badge className="bg-red-500 text-white">
+                      Popular
+                    </Badge>
+                  )}
+                </div>
                 {/* Room Type Badge */}
                 <div className="absolute top-3 left-3">
                   <Badge variant="secondary">
@@ -361,7 +361,7 @@ export default function RoomsPage({ rooms, filters, roomTypes }: RoomsPageProps)
                     <p className="text-sm text-muted-foreground">per night</p>
                   </div>
                   <div className="flex items-center gap-1">
-                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                    <Star className="h-4 w-4  text-[#F4C2A1]" />
                     <span className="text-sm">4.8</span>
                   </div>
                 </div>
@@ -369,7 +369,7 @@ export default function RoomsPage({ rooms, filters, roomTypes }: RoomsPageProps)
 
               <CardFooter>
                 <Button 
-                  className="w-full" 
+                  className="w-full bg-[#F4C2A1]" 
                   disabled={!room.is_available}
                   onClick={() => router.get(route('rooms.show', room.id))}
                 >

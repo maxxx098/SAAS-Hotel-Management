@@ -39,11 +39,16 @@ class RoomController extends Controller
             $query->where('is_available', $request->availability === 'available');
         }
 
+        // Filter by popularity
+        if ($request->filled('popular')) {
+            $query->where('is_popular', $request->popular === 'true');
+        }
+
         $rooms = $query->latest()->paginate(10)->withQueryString();
 
         return Inertia::render('dashboard/admin/rooms/index', [
             'rooms' => $rooms,
-            'filters' => $request->only(['search', 'type', 'availability']),
+            'filters' => $request->only(['search', 'type', 'availability', 'popular']),
             'roomTypes' => ['single', 'double', 'suite', 'family', 'deluxe'],
         ]);
     }
@@ -90,6 +95,7 @@ class RoomController extends Controller
         'images.*' => 'string|url',
         'is_available' => 'boolean',
         'is_active' => 'boolean',
+        'is_popular' => 'boolean',
     ]);
 
    $validated['images'] = $validated['images'] ?? [];
@@ -153,6 +159,7 @@ class RoomController extends Controller
             'images.*' => 'string|url',
             'is_available' => 'boolean',
             'is_active' => 'boolean',
+            'is_popular' => 'boolean',
         ]);
 
         $room->update($validated);

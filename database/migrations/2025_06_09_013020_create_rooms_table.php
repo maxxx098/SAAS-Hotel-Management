@@ -11,6 +11,7 @@ return new class extends Migration
     {
         Schema::create('rooms', function (Blueprint $table) {
             $table->id();
+            $table->boolean('is_popular')->default(false);
             $table->string('number')->unique(); // Room number (e.g., "101", "A-205")
             $table->string('name');
             $table->text('description')->nullable();

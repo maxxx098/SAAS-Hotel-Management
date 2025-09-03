@@ -386,7 +386,7 @@ export default function RoomShowPage({ room, relatedRooms, unavailableDates }: R
 
   return (
     <Layout>
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background py-20 lg:py-30">
         <Head title={room.name} />
         
         <div className="container mx-auto px-4 sm:px-6 lg:px-16 max-w-7xl py-8">

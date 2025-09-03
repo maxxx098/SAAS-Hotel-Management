@@ -25,6 +25,7 @@ class Room extends Model
         'images',
         'is_available',
         'is_active',
+        'is_popular',
     ];
 
     protected $casts = [
@@ -34,6 +35,7 @@ class Room extends Model
         'size' => 'decimal:2',
         'is_available' => 'boolean',
         'is_active' => 'boolean',
+        'is_popular' => 'boolean',
     ];
 
     // Accessor for formatted price

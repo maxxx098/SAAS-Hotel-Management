@@ -157,3 +157,35 @@
         @apply bg-background text-foreground;
     }
 }
+/* Basic smooth scrolling for the entire page */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Enhanced smooth scrolling with custom timing */
+* {
+    scroll-behavior: smooth;
+}
+
+/* Smooth scrolling for specific containers (optional) */
+.smooth-scroll {
+    scroll-behavior: smooth;
+}
+
+/* More advanced smooth scrolling with CSS scroll-snap (optional) */
+.scroll-container {
+    scroll-behavior: smooth;
+    scroll-snap-type: y mandatory;
+}
+
+.scroll-section {
+    scroll-snap-align: start;
+}
+
+/* Disable smooth scrolling for users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    html,
+    * {
+        scroll-behavior: auto !important;
+    }
+}

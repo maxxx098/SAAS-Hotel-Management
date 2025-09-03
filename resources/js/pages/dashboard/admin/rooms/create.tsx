@@ -282,6 +282,7 @@ function CreateRoomPage({ roomTypes, amenitiesOptions }: CreateRoomProps) {
     images: string[];
     is_available: boolean;
     is_active: boolean;
+    is_popular: boolean;
 };
 
   const [formData, setFormData] = useState<FormData>({
@@ -296,7 +297,8 @@ function CreateRoomPage({ roomTypes, amenitiesOptions }: CreateRoomProps) {
     amenities: [],
     images: [''],
     is_available: true,
-    is_active: true
+    is_active: true,
+    is_popular: false
 });
 type Errors = {
     number?: string;  // Add this line
@@ -448,7 +450,8 @@ const removeImageField = (index: number) => {
             amenities: formData.amenities,
             images: cleanedImages,
             is_available: formData.is_available,
-            is_active: formData.is_active
+            is_active: formData.is_active,
+            is_popular: formData.is_popular
         };
 
         console.log('Submitting data:', submitData);
@@ -770,42 +773,57 @@ const removeImageField = (index: number) => {
                 </Card>
 
                 {/* Room Status */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Room Status</CardTitle>
-                        <CardDescription>
-                            Set the initial availability and active status
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                        <div className="flex items-center justify-between">
-                            <div className="space-y-1">
-                                <Label>Available for Booking</Label>
-                                <p className="text-sm text-muted-foreground">
-                                    Whether this room can be booked by guests
-                                </p>
-                            </div>
-                            <Switch
-                                checked={formData.is_available}
-                                onCheckedChange={(checked) => handleInputChange('is_available', checked)}
-                            />
+              <Card>
+                <CardHeader>
+                    <CardTitle>Room Status</CardTitle>
+                    <CardDescription>
+                        Set the initial availability and active status
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    {/* Available */}
+                    <div className="flex items-center justify-between">
+                        <div className="space-y-1">
+                            <Label>Available for Booking</Label>
+                            <p className="text-sm text-muted-foreground">
+                                Whether this room can be booked by guests
+                            </p>
                         </div>
+                        <Switch
+                            checked={formData.is_available}
+                            onCheckedChange={(checked) => handleInputChange('is_available', checked)}
+                        />
+                    </div>
 
-                        <div className="flex items-center justify-between">
-                            <div className="space-y-1">
-                                <Label>Active Room</Label>
-                                <p className="text-sm text-muted-foreground">
-                                    Whether this room is active in the system
-                                </p>
-                            </div>
-                            <Switch
-                                checked={formData.is_active}
-                                onCheckedChange={(checked) => handleInputChange('is_active', checked)}
-                            />
+                    {/* Active */}
+                    <div className="flex items-center justify-between">
+                        <div className="space-y-1">
+                            <Label>Active Room</Label>
+                            <p className="text-sm text-muted-foreground">
+                                Whether this room is active in the system
+                            </p>
                         </div>
-                    </CardContent>
-                </Card>
+                        <Switch
+                            checked={formData.is_active}
+                            onCheckedChange={(checked) => handleInputChange('is_active', checked)}
+                        />
+                    </div>
 
+                    {/* ✅ Popular */}
+                    <div className="flex items-center justify-between">
+                        <div className="space-y-1">
+                            <Label>Popular Room</Label>
+                            <p className="text-sm text-muted-foreground">
+                                Mark this room as a popular choice
+                            </p>
+                        </div>
+                        <Switch
+                            checked={formData.is_popular}
+                            onCheckedChange={(checked) => handleInputChange('is_popular', checked)}
+                        />
+                    </div>
+                </CardContent>
+            </Card>
                 {/* Form Actions */}
                 <div className="flex items-center justify-end gap-4 pt-6">
                     <Button

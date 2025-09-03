@@ -20,7 +20,7 @@ class HousekeepingController extends BaseStaffController
         $user = auth()->user();
         $dashboardData = $this->getHousekeepingDashboardData($user);
 
-        return Inertia::render('dashboard/staff/housekeeping/index', [
+        return Inertia::render('dashboard/staff/index', [
             'dashboardData' => $dashboardData,
             ...$this->getBaseStaffData($user)
         ]);
@@ -40,11 +40,11 @@ class HousekeepingController extends BaseStaffController
         $today = Carbon::today();
 
         $assignedRooms = RoomAssignment::where('staff_id', $user->id)
-            ->whereDate('date', $today)
+            ->whereDate('assigned_date', $today) // ✅ fixed
             ->count();
 
         $cleanedRooms = RoomAssignment::where('staff_id', $user->id)
-            ->whereDate('date', $today)
+            ->whereDate('assigned_date', $today) // ✅ fixed
             ->where('status', 'completed')
             ->count();
 
@@ -62,7 +62,7 @@ class HousekeepingController extends BaseStaffController
 
         return RoomAssignment::with('room')
             ->where('staff_id', $user->id)
-            ->whereDate('date', $today)
+            ->whereDate('assigned_date', $today) // ✅ fixed
             ->where('status', '!=', 'completed')
             ->get()
             ->map(function ($assignment) {
@@ -95,7 +95,7 @@ class HousekeepingController extends BaseStaffController
         
         return RoomAssignment::with('room')
             ->where('staff_id', $user->id)
-            ->whereDate('date', $today)
+            ->whereDate('assigned_date', $today) // ✅ fixed
             ->get()
             ->map(function ($assignment) {
                 return [

@@ -3,28 +3,12 @@ import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem as BaseNavItem } from '@/types';
-
+import { Link, usePage } from '@inertiajs/react';
+import { BookOpen, Building, Calendar, ClipboardList, FileText, Folder, LayoutGrid, Shield, Users, Wrench } from 'lucide-react';
+import { route } from 'ziggy-js';
 type NavItem = BaseNavItem & {
     items?: BaseNavItem[];
 };
-import { Link, usePage } from '@inertiajs/react';
-import { route } from 'ziggy-js';
-import { 
-    BookOpen, 
-    Folder, 
-    LayoutGrid, 
-    Users, 
-    Settings, 
-    BarChart3, 
-    FileText, 
-    Shield,
-    ClipboardList,
-    User as UserIcon, 
-    Building,
-    Calendar,
-    Wrench,
-} from 'lucide-react';
-import AppLogo from './app-logo';
 
 interface User {
     id: number;
@@ -66,7 +50,7 @@ const getMainNavItems = (isAdmin: boolean, isStaff: boolean, userRole: string): 
 
     // Define staff roles
     const staffRoles = ['staff', 'front_desk', 'housekeeping', 'maintenance', 'security'];
-    
+
     if (isAdmin) {
         // Admin gets all admin navigation items
         const adminItems: NavItem[] = [
@@ -91,12 +75,12 @@ const getMainNavItems = (isAdmin: boolean, isStaff: boolean, userRole: string): 
                 icon: ClipboardList,
             },
         ];
-        
+
         return [...baseItems, ...adminItems];
     } else if (staffRoles.includes(userRole)) {
         // Staff members get staff-specific navigation items
         const staffItems: NavItem[] = [];
-        
+
         // Add role-specific items based on staff type
         switch (userRole) {
             case 'front_desk':
@@ -110,10 +94,10 @@ const getMainNavItems = (isAdmin: boolean, isStaff: boolean, userRole: string): 
                         title: 'Guest Check-outs',
                         href: route('staff.dashboard'),
                         icon: Calendar,
-                    }
+                    },
                 );
                 break;
-                
+
             case 'housekeeping':
                 staffItems.push(
                     {
@@ -125,42 +109,36 @@ const getMainNavItems = (isAdmin: boolean, isStaff: boolean, userRole: string): 
                         title: 'Cleaning Tasks',
                         href: route('staff.dashboard'),
                         icon: ClipboardList,
-                    }
+                    },
                 );
                 break;
-                
+
             case 'maintenance':
-                staffItems.push(
-                    {
-                        title: 'Maintenance Requests',
-                        href: route('staff.dashboard'),
-                        icon: Wrench,
-                    }
-                );
+                staffItems.push({
+                    title: 'Maintenance Requests',
+                    href: route('staff.dashboard'),
+                    icon: Wrench,
+                });
                 break;
-                
+
             case 'security':
-                staffItems.push(
-                    {
-                        title: 'Security Tasks',
-                        href: route('staff.dashboard'),
-                        icon: Shield,
-                    }
-                );
+                staffItems.push({
+                    title: 'Security Tasks',
+                    href: route('staff.dashboard'),
+                    icon: Shield,
+                });
                 break;
-                
+
             default:
                 // General staff items
-                staffItems.push(
-                    {
-                        title: 'My Tasks',
-                        href: route('staff.dashboard'),
-                        icon: ClipboardList,
-                    }
-                );
+                staffItems.push({
+                    title: 'My Tasks',
+                    href: route('staff.dashboard'),
+                    icon: ClipboardList,
+                });
                 break;
         }
-        
+
         return [...baseItems, ...staffItems];
     } else {
         // Regular users/clients get client navigation items
@@ -171,7 +149,7 @@ const getMainNavItems = (isAdmin: boolean, isStaff: boolean, userRole: string): 
                 icon: FileText,
             },
         ];
-        
+
         return [...baseItems, ...clientItems];
     }
 };
@@ -179,15 +157,15 @@ const getMainNavItems = (isAdmin: boolean, isStaff: boolean, userRole: string): 
 export function AppSidebar() {
     const { props } = usePage<PageProps>();
     const user = props.auth.user;
-    
+
     if (!user) {
         return null; // or some fallback UI
     }
-    
+
     const isAdmin = user?.is_admin || user?.role === 'admin';
     const staffRoles = ['staff', 'front_desk', 'housekeeping', 'maintenance', 'security'];
     const isStaff = staffRoles.includes(user.role) || isAdmin;
-    
+
     // Get navigation items based on user role
     const mainNavItems = getMainNavItems(isAdmin, isStaff, user.role);
 
@@ -206,7 +184,19 @@ export function AppSidebar() {
                     <SidebarMenuItem>
                         <SidebarMenuButton size="lg" asChild>
                             <Link href={route('dashboard')} prefetch>
-                                <AppLogo />
+                               <div className='flex items-center gap-2'>
+                                 <svg width={30} className='bg-white rounded-md' viewBox="0 0 25 25" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <g id="SVGRepo_bgCarrier" stroke-width="0"></g>
+                                    <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
+                                    <g id="SVGRepo_iconCarrier">
+                                        {' '}
+                                        <path d="M16.5 14.5L20.5 16.5L12.5 20.5L4.5 16.5L8.5 14.5" stroke="black" stroke-width="1.575"></path>{' '}
+                                        <path d="M16.5 10.5L20.5 12.5L12.5 16.5L4.5 12.5L8.5 10.5" stroke="black" stroke-width="1.575"></path>{' '}
+                                        <path d="M20.5 8.5L12.5 12.5L4.5 8.5L12.5 4.5L20.5 8.5Z" stroke="black" stroke-width="1.575"></path>{' '}
+                                    </g>
+                                </svg>
+                                <h1>Oasis Management</h1>
+                               </div>
                             </Link>
                         </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -215,24 +205,18 @@ export function AppSidebar() {
 
             <SidebarContent>
                 <NavMain items={mainNavItems} />
-                
+
                 {/* Show appropriate access badge */}
-                <div className="px-3 py-2 mt-4">
-                    <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200">
+                <div className="mt-4 px-3 py-2">
+                    <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-amber-700">
                         <Shield className="h-3 w-3" />
-                        <span className="text-xs font-medium">
-                            {accessLevel}
-                        </span>
-                    </div>
-                    {/* Debug info - remove in production */}
-                    <div className="mt-2 text-xs text-gray-500">
-                        Role: {user.role} | Is Admin: {isAdmin ? 'Yes' : 'No'} | Is Staff: {isStaff ? 'Yes' : 'No'}
+                        <span className="text-xs font-medium">{accessLevel}</span>
                     </div>
                 </div>
             </SidebarContent>
 
             <SidebarFooter>
-                <NavFooter items={footerNavItems} className="mt-auto" />
+
                 <NavUser />
             </SidebarFooter>
         </Sidebar>
