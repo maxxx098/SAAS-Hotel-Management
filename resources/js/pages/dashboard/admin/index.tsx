@@ -31,7 +31,7 @@ import { useState, useEffect } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
-        title: 'Dashboard',
+        title: 'Dashboard', // dashboard title
         href: '/dashboard',
     },
 ];
