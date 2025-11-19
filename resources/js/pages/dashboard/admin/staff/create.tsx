@@ -80,7 +80,7 @@ export default function StaffCreate() {
         e.preventDefault();
         post('/admin/staff', {
             onSuccess: () => {
-                reset();
+                reset(); // reset 
             },
         });
     };
