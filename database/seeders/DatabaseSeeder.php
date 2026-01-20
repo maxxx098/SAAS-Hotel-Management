@@ -21,7 +21,7 @@ class DatabaseSeeder extends Seeder
             'email' => 'admin@example.com',
             'password' => Hash::make('password'), // secure password
             'role' => 'admin',
-            'department' => 'Management',
+            'department' => 'Management', // department for admin
             'employee_id' => 'EMP-0001',
         ]);
 
