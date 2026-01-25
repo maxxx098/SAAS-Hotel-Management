@@ -143,31 +143,34 @@ class RoomController extends Controller
      * Update the specified room
      */
     public function update(Request $request, Room $room): RedirectResponse
-    {
-        $validated = $request->validate([
-            'number' => ['required', 'string', 'max:255', Rule::unique('rooms')->ignore($room->id)],
-            'name' => ['required', 'string', 'max:255', Rule::unique('rooms')->ignore($room->id)],
-            'description' => 'nullable|string',
-            'type' => 'required|string|in:single,double,suite,family,deluxe',
-            'price_per_night' => 'required|numeric|min:0',
-            'capacity' => 'required|integer|min:1|max:10',
-            'beds' => 'required|integer|min:1|max:5',
-            'size' => 'nullable|numeric|min:0',
-            'amenities' => 'nullable|array',
-            'amenities.*' => 'string',
-            'images' => 'nullable|array',
-            'images.*' => 'string|url',
-            'is_available' => 'boolean',
-            'is_active' => 'boolean',
-            'is_popular' => 'boolean',
-        ]);
+{
+    $validated = $request->validate([
+        'name' => ['required', 'string', 'max:255', Rule::unique('rooms')->ignore($room->id)],
+        'description' => 'nullable|string',
+        'type' => 'required|string|in:single,double,suite,family,deluxe',
+        'price_per_night' => 'required|numeric|min:0',
+        'capacity' => 'required|integer|min:1|max:10',
+        'beds' => 'required|integer|min:1|max:5',
+        'size' => 'nullable|numeric|min:0',
+        'amenities' => 'nullable|array',
+        'amenities.*' => 'string',
+        'images' => 'nullable|array',
+        'images.*' => 'string|url',
+        'is_available' => 'nullable|boolean',
+        'is_active' => 'nullable|boolean',
+        'is_popular' => 'nullable|boolean',
+    ]);
 
-        $room->update($validated);
+    // Set boolean defaults if not present
+    $validated['is_available'] = $validated['is_available'] ?? false;
+    $validated['is_active'] = $validated['is_active'] ?? false;
+    $validated['is_popular'] = $validated['is_popular'] ?? false;
 
-        return redirect()->route('admin.rooms.index')
-            ->with('success', 'Room updated successfully.');
-    }
+    $room->update($validated);
 
+    return redirect()->route('admin.rooms.index')
+        ->with('success', 'Room updated successfully.');
+}
     /**
      * Remove the specified room
      */

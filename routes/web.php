@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\BookingController as AdminBookingController;
 use App\Http\Controllers\Admin\RoomController as AdminRoomController;
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\StaffController;
+use App\Http\Controllers\RoomAvailabilityController;
 
 // Updated Staff Controllers
 use App\Http\Controllers\Staff\StaffDashboardController;
@@ -23,9 +24,24 @@ use App\Http\Controllers\Auth\StaffAuthenticatedSessionController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
+use App\Models\Room;
 
 Route::get('/', function () {
+    // Fetch rooms for the landing page
+    $rooms = Room::where('is_active', true)
+        ->where('is_available', true)
+        ->orderBy('is_popular', 'desc')
+        ->orderBy('created_at', 'desc')
+        ->limit(6) // Only show 6 rooms on home page
+        ->get();
+
     return Inertia::render('public/welcome', [
+        'rooms' => [
+            'data' => $rooms,
+            'total' => $rooms->count(),
+        ],
+        'filters' => [],
+        'roomTypes' => ['single', 'double', 'suite', 'family', 'deluxe'],
         'canLogin' => Route::has('login'),
         'canRegister' => Route::has('register'),
         'laravelVersion' => Application::VERSION,
@@ -33,7 +49,6 @@ Route::get('/', function () {
     ]);
 })->name('home');
 
-// Public room routes 
 Route::get('/rooms', [RoomController::class, 'index'])->name('rooms.index');
 Route::get('/rooms/{room}', [RoomController::class, 'show'])->name('rooms.show');
 
@@ -45,6 +60,13 @@ Route::middleware('guest')->group(function () {
         
     Route::post('/staff/login', [StaffAuthenticatedSessionController::class, 'store']);
 });
+
+Route::post('/check-availability', [
+    RoomAvailabilityController::class,
+    'checkAvailability'
+]);
+
+Route::post('/api/available-room-types', [RoomAvailabilityController::class, 'getAvailableRoomTypes']);
 
 Route::middleware(['auth', 'verified'])->group(function () {
     

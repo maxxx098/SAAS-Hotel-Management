@@ -20,14 +20,18 @@ const Textarea = (props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => (
 );
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-const Switch = (props: React.ComponentProps<'input'> & { checked: boolean; onCheckedChange: (checked: boolean) => void }) => (
-    <input
-        type="checkbox"
-        className="shadcn-switch"
-        onChange={e => props.onCheckedChange(e.target.checked)}
-        {...props}
-    />
-);
+const Switch = (props: React.ComponentProps<'input'> & { checked: boolean; onCheckedChange: (checked: boolean) => void }) => {
+    const { onCheckedChange, checked, ...inputProps } = props;
+    return (
+        <input
+            type="checkbox"
+            className="shadcn-switch"
+            checked={checked}
+            onChange={e => onCheckedChange(e.target.checked)}
+            {...inputProps}
+        />
+    );
+};
 import { 
     Select,
     SelectContent,
