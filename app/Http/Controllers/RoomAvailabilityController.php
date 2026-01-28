@@ -141,4 +141,46 @@ class RoomAvailabilityController extends Controller
             'room_types' => $availability,
         ]);
     }
+    /**
+ * Get all booked dates within a date range
+ */
+public function getBookedDates(Request $request): JsonResponse
+{
+    $validated = $request->validate([
+        'start_date' => 'required|date',
+        'end_date' => 'required|date|after_or_equal:start_date',
+    ]);
+
+    $startDate = Carbon::parse($validated['start_date']);
+    $endDate = Carbon::parse($validated['end_date']);
+
+    // Get all bookings in the date range
+    $bookings = Booking::whereIn('status', ['confirmed', 'pending'])
+        ->where(function ($query) use ($startDate, $endDate) {
+            $query->whereBetween('check_in', [$startDate, $endDate])
+                  ->orWhereBetween('check_out', [$startDate, $endDate])
+                  ->orWhere(function ($q) use ($startDate, $endDate) {
+                      $q->where('check_in', '<=', $startDate)
+                        ->where('check_out', '>=', $endDate);
+                  });
+        })
+        ->get();
+
+    // Generate all booked dates
+    $bookedDates = [];
+    foreach ($bookings as $booking) {
+        $current = Carbon::parse($booking->check_in);
+        $checkOut = Carbon::parse($booking->check_out);
+        
+        while ($current->lte($checkOut)) {
+            $bookedDates[] = $current->format('Y-m-d');
+            $current->addDay();
+        }
+    }
+
+    return response()->json([
+        'success' => true,
+        'booked_dates' => array_unique($bookedDates),
+    ]);
+}
 }

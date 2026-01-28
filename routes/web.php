@@ -48,7 +48,7 @@ Route::get('/', function () {
         'phpVersion' => PHP_VERSION,
     ]);
 })->name('home');
-
+Route::post('/api/booked-dates', [RoomAvailabilityController::class, 'getBookedDates']);
 Route::get('/rooms', [RoomController::class, 'index'])->name('rooms.index');
 Route::get('/rooms/{room}', [RoomController::class, 'show'])->name('rooms.show');
 

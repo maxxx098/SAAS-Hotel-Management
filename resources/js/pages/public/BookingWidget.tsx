@@ -28,7 +28,8 @@ const CalendarWidget: React.FC<{ onDateClick: (checkIn: string, checkOut: string
   const [selectedCheckOut, setSelectedCheckOut] = useState<number | null>(null);
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
-  const [bookedDates, setBookedDates] = useState<string[]>([]);
+  const [bookedDates, setBookedDates] = useState<Set<string>>(new Set());
+  const [isLoadingDates, setIsLoadingDates] = useState(false);
 
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -38,26 +39,53 @@ const CalendarWidget: React.FC<{ onDateClick: (checkIn: string, checkOut: string
   }, [currentMonth, currentYear]);
 
   const fetchBookedDates = async () => {
+    setIsLoadingDates(true);
     try {
-      // Mock booked dates - replace with your actual API call
-      // Format: 'YYYY-MM-DD'
-      const mockBooked = [
+      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+      
+      // Get first and last day of current month
+      const firstDay = new Date(currentYear, currentMonth, 1);
+      const lastDay = new Date(currentYear, currentMonth + 1, 0);
+      
+      const startDate = firstDay.toISOString().split('T')[0];
+      const endDate = lastDay.toISOString().split('T')[0];
+
+      const response = await fetch('/api/booked-dates', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': csrfToken || '',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          start_date: startDate,
+          end_date: endDate,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Assuming API returns { booked_dates: ['2024-01-05', '2024-01-06', ...] }
+        setBookedDates(new Set(data.booked_dates || []));
+      }
+    } catch (error) {
+      console.error('Error fetching booked dates:', error);
+      // Set some mock data for demo purposes
+      const mockBooked = new Set([
         `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-05`,
         `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-06`,
         `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-07`,
         `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-15`,
-        `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-20`,
-        `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-21`,
-      ];
+      ]);
       setBookedDates(mockBooked);
-    } catch (error) {
-      console.error('Error fetching booked dates:', error);
+    } finally {
+      setIsLoadingDates(false);
     }
   };
 
   const isDateBooked = (day: number) => {
     const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    return bookedDates.includes(dateStr);
+    return bookedDates.has(dateStr);
   };
   
   // Calculate days in current month
@@ -215,6 +243,22 @@ const CalendarWidget: React.FC<{ onDateClick: (checkIn: string, checkOut: string
           )}
         </div>
       )}
+
+      {/* Legend */}
+      <div className="mt-4 pt-4 border-t flex flex-wrap gap-3 text-xs">
+        <div className="flex items-center gap-1.5">
+          <div className="w-4 h-4 rounded-full bg-green-500"></div>
+          <span className="text-gray-600">Check-in</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-4 h-4 rounded-full bg-red-500"></div>
+          <span className="text-gray-600">Check-out</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-4 h-4 rounded-full bg-yellow-400"></div>
+          <span className="text-gray-600">Booked</span>
+        </div>
+      </div>
     </div>
   );
 };
@@ -231,43 +275,52 @@ const Rooms: React.FC = () => {
     setShowResults(false);
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
       
-      // Mock response - replace with actual API call
-      const mockRooms: Room[] = [
-        {
-          id: 1,
-          title: 'Deluxe Room',
-          name: 'Deluxe Ocean View',
-          type: 'deluxe',
-          capacity: 2,
-          beds: 1,
-          price_per_night: 5000,
-          total_price: 15000,
-          nights: 3,
-          amenities: ['WiFi', 'TV', 'Mini Bar', 'Ocean View'],
-          image: 'https://images.unsplash.com/photo-1611892440504-42a792e24d32?q=80&w=2070&auto=format&fit=crop'
-        },
-        {
-          id: 2,
-          title: 'Superior Room',
-          name: 'Superior Suite',
-          type: 'superior',
-          capacity: 3,
-          beds: 2,
-          price_per_night: 7500,
-          total_price: 22500,
-          nights: 3,
-          amenities: ['WiFi', 'TV', 'Kitchen', 'Balcony'],
-          image: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?q=80&w=2070&auto=format&fit=crop'
-        }
-      ];
+      if (!csrfToken) {
+        throw new Error('CSRF token not found');
+      }
 
-      setAvailableRooms(mockRooms);
-      setShowResults(true);
+      const response = await fetch('/check-availability', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': csrfToken,
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+          check_in: checkIn,
+          check_out: checkOut,
+          adults: 2, // Default values since we're not asking user
+          children: 0,
+          room_type: null,
+        }),
+      });
+
+      const data = await response.json();
+
+      // Handle CSRF token mismatch
+      if (response.status === 419 || (data.message && data.message.includes('CSRF'))) {
+        setError('Session expired. Please refresh the page and try again.');
+        setTimeout(() => window.location.reload(), 2000);
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to check availability');
+      }
+
+      if (data.success) {
+        setAvailableRooms(data.rooms || []);
+        setShowResults(true);
+      } else {
+        setError(data.message || 'No rooms available for selected dates');
+      }
     } catch (err: any) {
-      setError('Unable to check availability. Please try again.');
+      setError(err.message || 'Unable to check availability. Please try again.');
+      console.error('Availability check error:', err);
     } finally {
       setIsChecking(false);
     }
